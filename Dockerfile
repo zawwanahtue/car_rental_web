@@ -1,28 +1,26 @@
-# Use an official PHP image with Apache
-FROM php:8.2-apache
+# Use the official PHP image with Laravel dependencies
+FROM php:8.1-fpm
 
-# Install required PHP extensions
-RUN apt-get update && apt-get install -y \
-    git curl libpng-dev libonig-dev libxml2-dev zip unzip \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
+# Install system dependencies and PHP extensions
+RUN apt-get update && apt-get install -y libpng-dev libjpeg-dev libfreetype6-dev zip git unzip
 
-# Enable Apache rewrite module
-RUN a2enmod rewrite
+# Install Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Set working directory
-WORKDIR /var/www/html
+# Set the working directory
+WORKDIR /var/www
 
-# Copy composer and install dependencies
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Copy the application files into the container
 COPY . .
 
-RUN composer install --no-dev --optimize-autoloader
+# Install Laravel dependencies
+RUN composer install
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+# Run the Laravel API scaffolding setup (your command)
+RUN php artisan install:api
 
-# Copy virtual host config (optional for Laravel pretty URLs)
-COPY ./vhost.conf /etc/apache2/sites-available/000-default.conf
+# Expose port 9000 for PHP-FPM
+EXPOSE 9000
 
-# Expose port
-EXPOSE 80
+# Start the PHP-FPM server
+CMD ["php-fpm"]
