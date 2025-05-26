@@ -25,22 +25,13 @@ class UserController extends Controller
             'phone' => 'required|string|regex:/^\+?[1-9]\d{9,14}$/',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'user_profile_img' => 'nullable|image|max:2048', // 2MB max
         ]);
 
         try {
-            // if ($request->hasFile('user_profile_img')) {
-            //     $response_2 = $this->fileService->uploadToCloudflareR2(
-            //         $request->file('user_profile_img'),
-            //         'Images'
-            //     );
-            // }
-
             $response = $this->userService->register($data);
 
             return response()->json([
                 $response,
-                // 'profile_image_url' => $response_2 ?? null,
             ], 201);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 400);

@@ -20,7 +20,7 @@ class UserService
             'password' => Hash::make($data['password']),
         ]);
 
-        event(new Registered($user));
+        // event(new Registered($user));
 
         return [
             'message' => 'Account created successfully.',
