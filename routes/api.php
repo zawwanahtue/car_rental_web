@@ -3,8 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
-
-$usr_type = Auth::user() ? Auth::user()->user_type_id : null;
+use App\Helpers\Helper;
 
 // Route::get('/user', function (Request $request) {
 //     return $request->user();
@@ -30,7 +29,7 @@ Route::middleware('auth:sanctum')->group(function ()
         // Route::get('/users', [UserController::class, 'getAllUsers']);
     });
 
-    Route::get('/profile', [UserController::class, 'currentUser']);
+    Route::get('/profile', [UserController::class, 'profile']);
     Route::get('/logout', [UserController::class, 'logout']);
     Route::post('/upload&update-pf-img', [UserController::class, 'profileImageUpload']);
     Route::post('/update-profile', [UserController::class, 'updateUser']);
@@ -39,6 +38,7 @@ Route::middleware('auth:sanctum')->group(function ()
     Route::get('/verify-email/{id}/{hash}', [UserController::class, 'verify'])->name('verification.verify');
 });
 
+Route::get('/testing', [Helper::class, 'test']);
 Route::get('/list-file', [UserController::class, 'listFiles']);
 
 //// testing route

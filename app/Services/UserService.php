@@ -21,20 +21,25 @@ class UserService
 
     public function register(array $data)
     {
-        User::create([
-            'user_id' => (string) Str::uuid(), 
-            'user_type_id' => 1, 
-            'name' => $data['name'],
-            'phone' => $data['phone'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-        ]);
+        try
+        {
+            User::create([
+                'user_id' => (string) Str::uuid(), 
+                'user_type_id' => 1, 
+                'name' => $data['name'],
+                'phone' => $data['phone'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+            ]);
 
-        // event(new Registered($user));
+            // event(new Registered($user));
 
-        return [
-            'message' => 'Account created successfully.'
-        ];
+            return null;
+        }
+        catch (\Exception $e) 
+        {
+            return $e->getMessage();
+        }
     }
 
     public function login(array $credentials)
@@ -62,7 +67,16 @@ class UserService
             ->leftJoin('photo_paths as pp', 'u.photo_path_id', '=', 'pp.photo_path_id')
             ->where('u.user_id', $id)
             ->select(
-                'u.*',
+                'u.user_id',
+                'u.user_type_id',
+                'u.name',
+                'u.phone',
+                'u.email',
+                'u.address',
+                'u.email_verified_at',
+                'u.remember_token',
+                'u.created_at',
+                'u.updated_at',
                 DB::raw("CONCAT('" . env('R2_URL') . "/', pp.photo_path) as profile_image_url")
             )
             ->first();
@@ -132,7 +146,7 @@ class UserService
         }
     }
 
-    public function updateUser(array $data)
+    public function updateUser($data)
     {
         $userId = Auth::user()->user_id;
         $user = User::where('user_id', $userId)->first();
