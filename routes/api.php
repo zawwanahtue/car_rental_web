@@ -27,15 +27,18 @@ Route::middleware('auth:sanctum')->group(function ()
     // Admin routes
     Route::middleware('user_type:3')->prefix('/admin')->group(function (){
         // Route::get('/users', [UserController::class, 'getAllUsers']);
+        Route::get('/user-list', [UserController::class, 'userList']);
+        Route::patch('/ban-user/{id}', [UserController::class, 'banUser']);
     });
 
     Route::get('/profile', [UserController::class, 'profile']);
     Route::get('/logout', [UserController::class, 'logout']);
     Route::post('/upload&update-profile-image', [UserController::class, 'profileImageRequest']);
+    Route::delete('/delete-profile-image', [UserController::class, 'deleteProfileImage']);
     Route::put('/update-profile', [UserController::class, 'updateUser']);
 
-    Route::post('/email/verification-notification', [UserController::class, 'sendVerificationEmail']);
-    Route::get('/verify-email/{id}/{hash}', [UserController::class, 'verify'])->name('verification.verify');
+    // Route::post('/email/verification-notification', [UserController::class, 'sendVerificationEmail']);
+    // Route::get('/verify-email/{id}/{hash}', [UserController::class, 'verify'])->name('verification.verify');
 });
 
 Route::get('/testing', [Helper::class, 'test']);

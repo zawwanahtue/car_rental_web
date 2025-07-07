@@ -95,7 +95,7 @@ class UserController extends Controller
     {
         $rules = [
             'name' => 'sometimes|string|max:255',
-            'phone' => 'sometimes|string|regex:/^\d{9,14}$/',
+            'phone' => 'sometimes|string|regex:/^\+?\d{9,14}$/',
             'email' => 'sometimes|string|email|max:255|unique:users,email,' . Auth::user()->user_id . ',user_id',
             'address' => 'sometimes|string|max:255',
         ];
@@ -121,7 +121,7 @@ class UserController extends Controller
     public function profileImageRequest(Request $request)
     {
         $rules = [
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:10240',
         ];
 
         $validate = $this->helper->Validate($request, $rules);
@@ -134,6 +134,38 @@ class UserController extends Controller
             }
         } else {
             return $this->helper->PostMan(null, 422, $validate);
+        }
+    }
+
+    public function deleteProfileImage()
+    {
+        $id = Auth::user()->user_id;
+        $exists = $this->userService->alreadyExistsPhoto($id);
+        if ($exists) {
+            $delete = $this->fileService->deleteFile($exists);
+            if ($delete) {
+                return $this->helper->PostMan(null, 200, "Profile image deleted successfully");
+            } else {
+                return $this->helper->PostMan(null, 500, "Failed to delete profile image");
+            }
+        } else {
+            return $this->helper->PostMan(null, 404, "No profile image found to delete");
+        }
+    }
+
+    public function userList()
+    {
+        $users = $this->userService->getAllUsers();
+        return $this->helper->PostMan($users, 200, "Successfully Retrieved User List");
+    }
+
+    public function banAndUnbanUser($id)
+    {
+        $user = $this->userService->banUser($id);
+        if ($user) {
+            return $this->helper->PostMan($user, 200, "User Banned Successfully");
+        } else {
+            return $this->helper->PostMan(null, 404, "User Not Found");
         }
     }
 }

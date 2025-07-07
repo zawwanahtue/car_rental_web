@@ -73,8 +73,7 @@ class UserService
                 'u.phone',
                 'u.email',
                 'u.address',
-                'u.email_verified_at',
-                'u.remember_token',
+                'u.is_banned',
                 'u.created_at',
                 'u.updated_at',
                 DB::raw("CONCAT('" . env('R2_URL') . "/', pp.photo_path) as profile_image_url")
@@ -176,5 +175,44 @@ class UserService
 
         $userInfo = $this->currentUser($userId);
         return $userInfo;
+    }
+
+    public function getAllUsers()
+    {
+        $users = DB::table('users as u')
+            ->leftJoin('photo_paths as pp', 'u.photo_path_id', '=', 'pp.photo_path_id')
+            ->select(
+                'u.user_id',
+                'u.user_type_id',
+                'u.name',
+                'u.phone',
+                'u.email',
+                'u.address',
+                'u.is_banned',
+                'u.created_at',
+                'u.updated_at',
+                DB::raw("CONCAT('" . env('R2_URL') . "/', pp.photo_path) as profile_image_url")
+            )
+            ->get();
+
+        return $users;
+    }
+
+    public function banUser($id)
+    {
+        $user = DB::table('users')
+            ->where('user_id', $id)
+            ->first();
+
+        if (!$user) {
+            return null; 
+        }
+        else {
+            DB::table('users')
+                ->where('user_id', $id)
+                ->update(['is_banned' => true, 'updated_at' => now()]);
+
+            return $this->currentUser($id);
+        }
     }
 }
