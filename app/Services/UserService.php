@@ -42,12 +42,37 @@ class UserService
         }
     }
 
+    public function is_banned($email)
+    {
+        $user = DB::table('users')
+            ->where('email', $email)
+            ->where('is_banned', true)
+            ->first();
+
+        return $user ? true : false;
+    }
+
     public function login(array $credentials)
     {
-        $user = User::where('email', $credentials['email'])->first();
 
-        if (!$user || !Hash::check($credentials['password'], $user->password)) {
-            return null;
+        $is_banned = $this->is_banned($credentials['email']);
+        if ($is_banned) {
+            return [
+                'success' => false,
+                'message' => 'Your account is banned. Please contact for support from Contact Us Page.'
+            ];
+        }
+
+        $user = User::where('email', $credentials['email'])->first();
+        $password = DB::table('users')
+            ->where('email', $credentials['email'])
+            ->value('password');
+    
+        if (!$user || !Hash::check($credentials['password'], $password)) {
+            return [
+                'success' => false,
+                'message' => 'Invalid credentials.'
+            ];
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -56,6 +81,7 @@ class UserService
         $userInfo = $this->currentUser($user->user_id);
 
         return [
+            'success' => true,
             'token' => $tokenValue,
             'user' => $userInfo
         ];
@@ -89,7 +115,7 @@ class UserService
             ->leftJoin('photo_paths as pp', 'u.photo_path_id', '=', 'pp.photo_path_id')
             ->where('u.user_id', $id)
             ->whereNotNull('pp.photo_path')
-            ->value('pp.photo_path'); // select only one value
+            ->value('pp.photo_path'); 
 
         return $photoPath ? $photoPath : null;
     }
@@ -133,6 +159,45 @@ class UserService
                     'success' => true,
                     'message' => $upload
                 ];
+        }
+    }
+
+    public function deleteProfileImage()
+    {
+        $id = Auth::user()->user_id;
+        $exists = $this->alreadyExistsPhoto($id);
+        if ($exists) {
+            $delete = $this->fileService->deleteFile($exists);
+            if ($delete) {
+                $currentPathId = DB::table('users')
+                    ->where('user_id', $id)
+                    ->value('photo_path_id');
+
+                if ($currentPathId) {
+                    DB::table('photo_paths')
+                        ->where('photo_path_id', $currentPathId)
+                        ->delete();
+                }
+
+                DB::table('users')
+                    ->where('user_id', $id)
+                    ->update(['photo_path_id' => null, 'updated_at' => now()]);
+
+                return [
+                    'success' => true,
+                    'message' => 'Profile image deleted successfully'
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'message' => 'Failed to delete profile image'
+                ];
+            }
+        } else {
+            return [
+                'success' => false,
+                'message' => 'No profile image found to delete'
+            ];
         }
     }
 
@@ -180,6 +245,7 @@ class UserService
     public function getAllUsers()
     {
         $users = DB::table('users as u')
+            ->where('u.user_type_id', '!=', 1) // Exclude admin users
             ->leftJoin('photo_paths as pp', 'u.photo_path_id', '=', 'pp.photo_path_id')
             ->select(
                 'u.user_id',

@@ -62,8 +62,8 @@ class UserController extends Controller
         {
             $result = $this->userService->login($request->only('email', 'password'));
 
-            if (!$result) {
-                return $this->helper->PostMan(null, 401, "Invlid Credential");
+            if ($result['success'] === false) {
+                return $this->helper->PostMan(null, 401, $result['message']);
             }
 
             return $this->helper->PostMan($result, 200, "Successfully Logined");
@@ -139,17 +139,11 @@ class UserController extends Controller
 
     public function deleteProfileImage()
     {
-        $id = Auth::user()->user_id;
-        $exists = $this->userService->alreadyExistsPhoto($id);
-        if ($exists) {
-            $delete = $this->fileService->deleteFile($exists);
-            if ($delete) {
-                return $this->helper->PostMan(null, 200, "Profile image deleted successfully");
-            } else {
-                return $this->helper->PostMan(null, 500, "Failed to delete profile image");
-            }
+        $is_delete = $this->userService->deleteProfileImage();
+        if ($is_delete['success']) {
+            return $this->helper->PostMan(null, 200, $is_delete['message']);
         } else {
-            return $this->helper->PostMan(null, 404, "No profile image found to delete");
+            return $this->helper->PostMan(null, 500, $is_delete['message']);
         }
     }
 
