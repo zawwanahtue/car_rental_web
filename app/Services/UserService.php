@@ -242,10 +242,10 @@ class UserService
         return $userInfo;
     }
 
-    public function getAllUsers()
+    public function getAllUsers($type)
     {
         $users = DB::table('users as u')
-            ->where('u.user_type_id', '!=', 1) // Exclude admin users
+            ->where('u.user_type_id', '=', $type) 
             ->leftJoin('photo_paths as pp', 'u.photo_path_id', '=', 'pp.photo_path_id')
             ->select(
                 'u.user_id',

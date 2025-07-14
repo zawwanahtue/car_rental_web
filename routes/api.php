@@ -27,8 +27,8 @@ Route::middleware('auth:sanctum')->group(function ()
     // Admin routes
     Route::middleware('user_type:3')->prefix('/admin')->group(function (){
         // Route::get('/users', [UserController::class, 'getAllUsers']);
-        Route::get('/user-list', [UserController::class, 'userList']);
-        Route::patch('/ban-user/{id}', [UserController::class, 'banUser']);
+        Route::get('/user-list/{type}', [UserController::class, 'userList']);
+        Route::patch('/ban-user/{id}', [UserController::class, 'banAndUnbanUser']);
     });
 
     Route::get('/profile', [UserController::class, 'profile']);
