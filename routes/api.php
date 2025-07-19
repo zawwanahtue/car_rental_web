@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\CarController;
 use App\Helpers\Helper;
 
 // Route::get('/user', function (Request $request) {
@@ -29,6 +30,23 @@ Route::middleware('auth:sanctum')->group(function ()
         // Route::get('/users', [UserController::class, 'getAllUsers']);
         Route::get('/user-list/{type}', [UserController::class, 'userList']);
         Route::patch('/ban-user/{id}', [UserController::class, 'banAndUnbanUser']);
+
+        // Car routes
+        Route::get('/cars-add', [CarController::class, 'addCar']);
+        Route::get('/cars-list', [CarController::class, 'listCars']);
+        Route::get('/cars-edit/{id}', [CarController::class, 'editCar']);
+        Route::post('/cars-create', [CarController::class, 'createCar']);
+        Route::put('/cars-update/{id}', [CarController::class, 'updateCar']);
+        Route::delete('/cars-delete/{id}', [CarController::class, 'deleteCar']);
+        Route::get('/cars-search', [CarController::class, 'searchCars']);
+        Route::get('/cars-filter', [CarController::class, 'filterCars']);
+
+        // Car Type routes
+        Route::get('/car-types', [CarController::class, 'carTypes']);
+        Route::get('/car-type/{id}', [CarController::class, 'carTypeById']);   
+        Route::post('/car-type-create', [CarController::class, 'createCarType']);
+        Route::post('/car-type-update/{id}', [CarController::class, 'updateCarType']);
+        Route::delete('/car-type-delete/{id}', [CarController::class, 'deleteCarType']);
     });
 
     Route::get('/profile', [UserController::class, 'profile']);
