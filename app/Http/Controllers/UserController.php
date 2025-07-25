@@ -147,15 +147,11 @@ class UserController extends Controller
         }
     }
 
-    public function userList($type)
+    public function userList()
     {
-        if (!in_array($type, [1, 2, 3])) {
-            return $this->helper->PostMan(null, 400, "Invalid user type");
-        }
-
-        $users = $this->userService->getAllUsers($type);
+        $users = $this->userService->getAllUsers();
         if (is_null($users)) {
-            return $this->helper->PostMan(null, 404, "No users found for this type");
+            return $this->helper->PostMan(null, 404, "No users found");
         }
         
         return $this->helper->PostMan($users, 200, "Successfully Retrieved User List");
