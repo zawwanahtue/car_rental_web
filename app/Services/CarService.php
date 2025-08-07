@@ -13,30 +13,7 @@ class CarService
         $this->fileService = $fileService;
     }
 
-
-    // // This service will handle car-related business logic
-    // public function createCar(array $data)
-    // {
-    //     // Logic to create a car in the database
-    //     // For example, using Eloquent to save a new Car model
-    //     // return Car::create($data);
-        
-    //     // Placeholder return for now
-    //     return true;
-    // }
-
-    // public function getCarById($id)
-    // {
-    //     // Logic to retrieve a car by its ID
-    //     // return Car::find($id);
-        
-    //     // Placeholder return for now
-    //     return null;
-    // }
-
-
     ///Car Type
-
     public function carTypes()
     {
         $carTypes = DB::table('car_type as ct')
@@ -112,12 +89,16 @@ class CarService
             }
             DB::table('photo_paths')
             ->where('photo_path_id', $carType->photo_path_id)
-            ->update(['photo_path' => $photoPath]);
+            ->update(
+                ['photo_path' => $photoPath],
+                ['updated_at' => now()]
+            );
         }
 
         DB::table('car_type')->where('car_type_id', $data['id'])->update([
             'type_name' => $data['type_name'] ?? $carType->type_name,
             'description' => $data['description'] ?? $carType->description,
+            'updated_at' => now(),
         ]);
 
         return null; 
@@ -143,4 +124,122 @@ class CarService
 
         return null; 
     }
+    
+    ///Car
+    public function listCars()
+    {
+        $cars = DB::table('cars as c')
+            ->leftJoin('car_type as ct', 'c.car_type_id', '=', 'ct.car_type_id')
+            ->leftJoin('photo_paths as pp', 'c.photo_path_id', '=', 'pp.photo_path_id')
+            ->select(
+                'c.car_id',
+                'ct.type_name as car_type',
+                'c.model',
+                'c.license_plate',
+                'c.price_per_hour',
+                'c.price_per_day',
+                'c.availability',
+                'c.number_of_seats',
+                'c.luggage_capacity',
+                'c.color',
+                'c.transmission',
+                'c.fuel_type',
+                DB::raw("CONCAT('" . env('R2_URL') . "/', pp.photo_path) as car_image_url")
+            )
+            ->get();
+        return $cars;
+    }
+
+    public function addCar(array $data)
+    {
+        $photoPath = $this->fileService->uploadFile($data['car_image'], 'Cars/');
+        if (!$photoPath) {
+            return "Failed to upload car image.";
+        }
+
+        $carId = DB::table('cars')->insertGetId([
+            'car_type_id' => $data['car_type_id'],
+            'model' => $data['car_model'],
+            'license_plate' => $data['license_plate'],
+            'price_per_hour' => $data['price_per_hour'],
+            'price_per_day' => $data['price_per_day'],
+            'availability' => true,
+            'number_of_seats' => $data['number_of_seats'],
+            'luggage_capacity' => $data['luggage_capacity'],
+            'color' => $data['color'],
+            'transmission' => $data['transmission'],
+            'fuel_type' => $data['fuel_type'],
+            'photo_path_id' => DB::table('photo_paths')->insertGetId(['photo_path' => $photoPath]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $carId ? null : "Failed to create car.";
+    }
+
+    public function getCarById($id)
+    {
+        $car = DB::table('cars as c')
+            ->leftJoin('car_type as ct', 'c.car_type_id', '=', 'ct.car_type_id')
+            ->leftJoin('photo_paths as pp', 'c.photo_path_id', '=', 'pp.photo_path_id')
+            ->select(
+                'c.car_id',
+                'ct.type_name as car_type',
+                'c.model',
+                'c.license_plate',
+                'c.price_per_hour',
+                'c.price_per_day',
+                'c.availability',
+                'c.number_of_seats',
+                'c.luggage_capacity',
+                'c.color',
+                'c.transmission',
+                'c.fuel_type',
+                DB::raw("CONCAT('" . env('R2_URL') . "/', pp.photo_path) as car_image_url")
+            )
+            ->where('c.car_id', $id)
+            ->first();
+
+        return $car;
+    }
+
+    public function updateCar($data)
+    {
+        $car = DB::table('cars')->where('car_id', $data['id'])->first();
+        if (!$car) {
+            return "Car not found.";
+        }
+
+        if (isset($data['car_image'])) {
+            $existsPhotoPath = $this->fileService->alreadyExistsCarImage($car->photo_path_id);
+            $photoDelete = $this->fileService->deleteFile($existsPhotoPath);
+            if (!$photoDelete) {
+                return "Failed to delete old car image.";
+            }
+            $photoPath = $this->fileService->uploadFile($data['car_image'], 'Cars/');
+            if (!$photoPath) {
+                return "Failed to upload car image.";
+            }
+            DB::table('photo_paths')
+                ->where('photo_path_id', $car->photo_path_id)
+                ->update(['photo_path' => $photoPath]);
+        }
+
+        DB::table('cars')->where('car_id', $data['id'])->update([
+            'car_type_id' => $data['car_type_id'] ?? $car->car_type_id,
+            'model' => $data['car_model'] ?? $car->model,
+            'license_plate' => $data['license_plate'] ?? $car->license_plate,
+            'price_per_hour' => $data['price_per_hour'] ?? $car->price_per_hour,
+            'price_per_day' => $data['price_per_day'] ?? $car->price_per_day,
+            'availability' => isset($data['availability']) ? (bool)$data['availability'] : $car->availability,
+            'number_of_seats' => $data['number_of_seats'] ?? $car->number_of_seats,
+            'luggage_capacity' => $data['luggage_capacity'] ?? $car->luggage_capacity,
+            'color' => $data['color'] ?? $car->color,
+            'transmission' => $data['transmission'] ?? $car->transmission,
+            'fuel_type' => $data['fuel_type'] ?? $car->fuel_type,
+        ]);
+
+        return null; 
+    }
+
 }

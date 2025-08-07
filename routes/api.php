@@ -28,9 +28,9 @@ Route::middleware('auth:sanctum')->group(function ()
         Route::patch('/ban-user/{id}', [UserController::class, 'banAndUnbanUser']);
 
         // Car routes
-        Route::get('/cars-add', [CarController::class, 'addCar']);
-        Route::get('/cars-list', [CarController::class, 'listCars']);
-        Route::get('/cars-edit/{id}', [CarController::class, 'editCar']);
+        Route::post('/cars-add', [CarController::class, 'addCar']);
+        Route::get('/cars', [CarController::class, 'listCars']);
+        Route::get('/car/{id}', [CarController::class, 'getCarById']);
         Route::post('/cars-create', [CarController::class, 'createCar']);
         Route::put('/cars-update/{id}', [CarController::class, 'updateCar']);
         Route::delete('/cars-delete/{id}', [CarController::class, 'deleteCar']);
