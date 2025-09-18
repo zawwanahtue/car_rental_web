@@ -151,13 +151,37 @@ class CarController extends Controller
         }
     }
 
-    public function updateCar($id)
+    public function updateCar(Request $request, $id)
     {
-        $car = $this->carService->updateCar($id);
-        if ($car) {
-            return $this->helper->PostMan($car, 200, "Car Retrieved Successfully");
-        } else {
-            return $this->helper->PostMan(null, 404, "Car Not Found");
+        $rule = [
+            'car_model' => 'nullable|string|max:255',
+            'license_plate' => 'nullable|string|unique:cars,license_plate',
+            'car_type_id' => 'nullable|integer|exists:car_type,car_type_id',
+            'price_per_hour' => 'nullable|numeric|min:0',
+            'price_per_day' => 'nullable|numeric|min:0',
+            'number_of_seats' => 'nullable|integer|min:1',
+            'luggage_capacity' =>   'nullable|integer|min:0',
+            'color' => 'nullable|string|max:50',
+            'transmission' => 'nullable|string|in:auto,manual',
+            'fuel_type' =>  'nullable|string|in:petrol,diesel,electric',
+            'car_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
+        ];
+
+        $validate = $this->helper->validate($request, $rule);
+        if (is_null($validate))
+        {
+            $data = $request->all();
+            $data['id'] = $id; 
+            $response = $this->carService->updateCar($data);
+            if (is_null($response)) {
+                return $this->helper->PostMan($response, 200, "Car Updated Successfully");
+            } else {
+                return $this->helper->PostMan(null, 500, $response);
+            }
+        }
+        else
+        {
+            return $this->helper->PostMan(null, 422, $validate);
         }
     }
 }

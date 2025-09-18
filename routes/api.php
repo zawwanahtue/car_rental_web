@@ -3,11 +3,17 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\ImageController;
 use App\Http\Controllers\CarController;
+use App\Http\Controllers\LocationController;
 use App\Helpers\Helper;
+
+Route::get('/proxy-image', [ImageController::class, 'proxyImage']);
 
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/login', [UserController::class, 'login']);
+Route::get('/locations', [LocationController::class, 'getAllLocations']);
+Route::get('/car-types', [CarController::class, 'carTypes']);
 
 Route::middleware('auth:sanctum')->group(function () 
 {
@@ -32,13 +38,12 @@ Route::middleware('auth:sanctum')->group(function ()
         Route::get('/cars', [CarController::class, 'listCars']);
         Route::get('/car/{id}', [CarController::class, 'getCarById']);
         Route::post('/cars-create', [CarController::class, 'createCar']);
-        Route::put('/cars-update/{id}', [CarController::class, 'updateCar']);
+        Route::post('/cars-update/{id}', [CarController::class, 'updateCar']);
         Route::delete('/cars-delete/{id}', [CarController::class, 'deleteCar']);
         Route::get('/cars-search', [CarController::class, 'searchCars']);
         Route::get('/cars-filter', [CarController::class, 'filterCars']);
 
         // Car Type routes
-        Route::get('/car-types', [CarController::class, 'carTypes']);
         Route::get('/car-type/{id}', [CarController::class, 'carTypeById']);   
         Route::post('/car-type-create', [CarController::class, 'createCarType']);
         Route::post('/car-type-update/{id}', [CarController::class, 'updateCarType']);

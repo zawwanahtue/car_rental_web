@@ -147,14 +147,14 @@ class UserController extends Controller
         }
     }
 
-    public function userList()
+    public function userList() 
     {
         $users = $this->userService->getAllUsers();
         if (is_null($users)) {
             return $this->helper->PostMan(null, 404, "No users found");
         }
         
-        return $this->helper->PostMan($users, 200, "Successfully Retrieved User List");
+        return $this->helper->PostMan($users, 200, "Successfully Retrieved User");
     }
 
     public function banAndUnbanUser($id)
