@@ -6,6 +6,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\CarController;
 use App\Http\Controllers\LocationController;
+use App\Http\Controllers\BookingController;
 use App\Helpers\Helper;
 
 Route::get('/proxy-image', [ImageController::class, 'proxyImage']);
@@ -19,7 +20,7 @@ Route::middleware('auth:sanctum')->group(function ()
 {
     // User routes
     Route::middleware('user_type:1')->prefix('/user')->group(function (){
-        // Route::get('/current', [UserController::class, 'currentUser']);
+        
     });
 
     // Staff routes
@@ -34,21 +35,47 @@ Route::middleware('auth:sanctum')->group(function ()
         Route::patch('/ban-user/{id}', [UserController::class, 'banAndUnbanUser']);
 
         // Car routes
-        Route::post('/cars-add', [CarController::class, 'addCar']);
-        Route::get('/cars', [CarController::class, 'listCars']);
-        Route::get('/car/{id}', [CarController::class, 'getCarById']);
-        Route::post('/cars-create', [CarController::class, 'createCar']);
-        Route::post('/cars-update/{id}', [CarController::class, 'updateCar']);
-        Route::delete('/cars-delete/{id}', [CarController::class, 'deleteCar']);
-        Route::get('/cars-search', [CarController::class, 'searchCars']);
-        Route::get('/cars-filter', [CarController::class, 'filterCars']);
+        Route::post('/car-create', [CarController::class, 'addCar']);
+        Route::patch('/car-update/{id}', [CarController::class, 'updateCar']);
+        Route::delete('/car-delete/{id}', [CarController::class, 'deleteCar']);
 
         // Car Type routes
-        Route::get('/car-type/{id}', [CarController::class, 'carTypeById']);   
         Route::post('/car-type-create', [CarController::class, 'createCarType']);
         Route::post('/car-type-update/{id}', [CarController::class, 'updateCarType']);
         Route::delete('/car-type-delete/{id}', [CarController::class, 'deleteCarType']);
+
+        // Booking Type routes
+        Route::post('/booking-type-create', [BookingController::class, 'createBookingType']);
+        Route::put('/booking-type-update/{id}', [BookingController::class, 'updateBookingType']);
+        Route::delete('/booking-type-delete/{id}', [BookingController::class, 'deleteBookingType']);
+
+        // Location Type routes
+        Route::post('/location-type-create', [LocationController::class, 'createLocationType']);
+        Route::put('/location-type-update/{id}', [LocationController::class, 'updateLocationType']);
+        Route::delete('/location-type-delete/{id}', [LocationController::class, 'deleteLocationType']);
     });
+
+    // Car routes 
+    Route::get('/cars', [CarController::class, 'getCars']);
+
+    // Booking routes
+    Route::get('/bookings', [BookingController::class, 'getBookings']);
+    Route::get('/bookings/user/{id}', [BookingController::class, 'getBookingByUser']);
+    Route::post('/booking-create', [BookingController::class, 'createBooking']);
+    Route::patch('/booking-cancel/{id}', [BookingController::class, 'cancelBooking']);
+    Route::patch('/booking-complete/{id}', [BookingController::class, 'completeBooking']);
+
+    // Booking type routes
+    Route::get('/booking-types', [BookingController::class, 'getBookingType']);
+    
+    // Location routes
+    Route::get('/locations', [LocationController::class, 'getAllLocations']);
+    Route::post('/location-create', [LocationController::class, 'createLocation']);
+    Route::put('/location-update/{id}', [LocationController::class, 'updateLocation']);
+    Route::delete('/location-delete/{id}', [LocationController::class, 'deleteLocation']);
+
+    // Location Type routes
+    Route::get('/location-types', [LocationController::class, 'getAllLocationTypes']);
 
     Route::get('/profile', [UserController::class, 'profile']);
     Route::get('/logout', [UserController::class, 'logout']);
@@ -60,7 +87,7 @@ Route::middleware('auth:sanctum')->group(function ()
     // Route::get('/verify-email/{id}/{hash}', [UserController::class, 'verify'])->name('verification.verify');
 });
 
-Route::get('/testing', [CarController::class, 'deleteCarType']);
-Route::get('/list-file', [UserController::class, 'listFiles']);
+        Route::post('/car-create', [CarController::class, 'addCar']);
+        Route::get('/list-file', [UserController::class, 'listFiles']);
 
 //// testing route

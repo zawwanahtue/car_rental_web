@@ -2,15 +2,18 @@
 namespace App\Services;
 
 use App\Services\FileService;
+use App\Services\CommonService;
 use Illuminate\Support\Facades\DB;
 use Termwind\Components\Raw;
 
 class CarService
 {
     protected $fileService;
-    public function __construct(FileService $fileService)
+    protected $commonService;
+    public function __construct(FileService $fileService, CommonService $commonService)
     {
         $this->fileService = $fileService;
+        $this->commonService = $commonService;
     }
 
     ///Car Type
@@ -106,6 +109,11 @@ class CarService
 
     public function deleteCarType($id)
     {
+        $isRelate = $this->commonService->ForeignKeyIsExit("car_types", "car_type_id", $id);
+        if (!$isRelate) {
+            return "Car type have used. Cannot delete.";
+        }
+
         $carType = DB::table('car_type')->where('car_type_id', $id)->first();
         if (!$carType) {
             return "Car type not found.";
@@ -126,7 +134,8 @@ class CarService
     }
     
     ///Car
-    public function listCars()
+
+    public function getCars()
     {
         $cars = DB::table('cars as c')
             ->leftJoin('car_type as ct', 'c.car_type_id', '=', 'ct.car_type_id')
@@ -159,7 +168,7 @@ class CarService
 
         $carId = DB::table('cars')->insertGetId([
             'car_type_id' => $data['car_type_id'],
-            'model' => $data['car_model'],
+            'model' => $data['model'],
             'license_plate' => $data['license_plate'],
             'price_per_hour' => $data['price_per_hour'],
             'price_per_day' => $data['price_per_day'],
@@ -170,37 +179,13 @@ class CarService
             'transmission' => $data['transmission'],
             'fuel_type' => $data['fuel_type'],
             'photo_path_id' => DB::table('photo_paths')->insertGetId(['photo_path' => $photoPath]),
+            'owner_id' => $data['owner_id'],
+            'ownership_condition' => $data['ownership_condition'],
             'created_at' => now(),
             'updated_at' => now(),
         ]);
 
         return $carId ? null : "Failed to create car.";
-    }
-
-    public function getCarById($id)
-    {
-        $car = DB::table('cars as c')
-            ->leftJoin('car_type as ct', 'c.car_type_id', '=', 'ct.car_type_id')
-            ->leftJoin('photo_paths as pp', 'c.photo_path_id', '=', 'pp.photo_path_id')
-            ->select(
-                'c.car_id',
-                'ct.type_name as car_type',
-                'c.model',
-                'c.license_plate',
-                'c.price_per_hour',
-                'c.price_per_day',
-                'c.availability',
-                'c.number_of_seats',
-                'c.luggage_capacity',
-                'c.color',
-                'c.transmission',
-                'c.fuel_type',
-                DB::raw("CONCAT('" . env('R2_URL') . "/', pp.photo_path) as car_image_url")
-            )
-            ->where('c.car_id', $id)
-            ->first();
-
-        return $car;
     }
 
     public function updateCar($data)
@@ -244,6 +229,17 @@ class CarService
 
     public function deleteCar($id)
     {
-
+        $car = DB::table('cars')->where('car_id', $id)->first();
+        if (!$car) {
+            return "Car not found.";
+        }
+        $existsPhotoPath = $this->alreadyExistsImagePath($car->photo_path_id);
+        $photoDelete = $this->fileService->deleteFile($existsPhotoPath);
+        if (!$photoDelete) {
+            return "Failed to delete old car image.";
+        }
+        DB::table('photo_paths')->where('photo_path_id', $car->photo_path_id)->delete();
+        DB::table('cars')->where('car_id', $id)->delete();
+        return null;
     }
 }

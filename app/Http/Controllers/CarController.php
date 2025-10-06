@@ -5,16 +5,19 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Services\CarService;
 use App\Helpers\Helper;
+use App\Services\CommonService;
 
 class CarController extends Controller
 {
     protected $carService;
     protected $helper;
+    protected $commonService;
 
-    public function __construct(CarService $carService, Helper $helper)
+    public function __construct(CarService $carService, Helper $helper, CommonService $commonService)
     {
         $this->carService = $carService;
         $this->helper = $helper;
+        $this->commonService = $commonService;
     }
 
     // public function createCar()
@@ -54,16 +57,6 @@ class CarController extends Controller
         }
     }
 
-    public function carTypeById($id)
-    {
-        $carType = $this->carService->getCarTypeById($id);
-        if ($carType) {
-            return $this->helper->PostMan($carType, 200, "Car Type Retrieved Successfully");
-        } else {
-            return $this->helper->PostMan(null, 404, "Car Type Not Found");
-        }
-    }
-
     public function updateCarType(Request $request, $id)
     {
         $rules = [
@@ -92,8 +85,12 @@ class CarController extends Controller
         }
     }
 
-    public function deleteCarType($id = 11)
+    public function deleteCarType($id)
     {
+        $isRelated = $this->commonService->ForeignKeyIsExit("cars", "car_type_id", $id);
+        if (!$isRelated) {
+            return $this->helper->PostMan(null, 404, "Car type have used. Cannot delete.");
+        }
         $carType = $this->carService->deleteCarType($id);
         if (is_null($carType)) {
             return $this->helper->PostMan(null, 200, "Car type deleted successfully");
@@ -102,26 +99,17 @@ class CarController extends Controller
     }
 
     ///Car
-    public function listCars()
-    {
-        $cars = $this->carService->listCars();
-        return $this->helper->PostMan($cars, 200, "Cars Retrieved Successfully");
-    }
 
-    public function getCarById($id)
+    public function getCars()
     {
-        $car = $this->carService->getCarById($id);
-        if ($car) {
-            return $this->helper->PostMan($car, 200, "Car Retrieved Successfully");
-        } else {
-            return $this->helper->PostMan(null, 404, "Car Not Found");
-        }
+        $cars = $this->carService->getCars();
+        return $this->helper->PostMan($cars, 200, "Cars Retrieved Successfully");
     }
 
     public function addCar(Request $request)
     {
         $rule = [
-            'car_model' => 'required|string|max:255',
+            'model' => 'required|string|max:255',
             'license_plate' => 'required|string|unique:cars,license_plate',
             'car_type_id' => 'required|integer|exists:car_type,car_type_id',
             'price_per_hour' => 'required|numeric|min:0',
@@ -132,6 +120,8 @@ class CarController extends Controller
             'transmission' => 'required|string|in:auto,manual',
             'fuel_type' =>  'required|string|in:petrol,diesel,electric',
             'car_image' => 'required|image|mimes:jpeg,png,jpg,gif|max:10240',
+            'owner_id' => 'required|integer|exists:owners,owner_id',
+            'ownership_condition' => 'required|string|in:company_owned,external_owned',
         ];
 
         $validate = $this->helper->validate($request, $rule);
@@ -154,7 +144,7 @@ class CarController extends Controller
     public function updateCar(Request $request, $id)
     {
         $rule = [
-            'car_model' => 'nullable|string|max:255',
+            'model' => 'nullable|string|max:255',
             'license_plate' => 'nullable|string|unique:cars,license_plate',
             'car_type_id' => 'nullable|integer|exists:car_type,car_type_id',
             'price_per_hour' => 'nullable|numeric|min:0',
@@ -183,5 +173,19 @@ class CarController extends Controller
         {
             return $this->helper->PostMan(null, 422, $validate);
         }
+    }
+
+    public function deleteCar($id)
+    {
+        $isRelated = $this->commonService->ForeignKeyIsExit("bookings", "car_id", $id);
+        $isRelated1 = $this->commonService->ForeignKeyIsExit("maintenances", "car_id", $id);
+        if ($isRelated || $isRelated1) {
+            return $this->helper->PostMan(null, 404, "Car have used. Cannot delete.");
+        }
+        $car = $this->carService->deleteCar($id);
+        if (is_null($car)) {
+            return $this->helper->PostMan(null, 200, "Car deleted successfully");
+        }
+        return $this->helper->PostMan(null, 404, $car);
     }
 }
