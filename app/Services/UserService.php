@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Services\FileService;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\Welcome;
 
 class UserService
 {
@@ -21,24 +23,23 @@ class UserService
 
     public function register(array $data)
     {
-        try
+        $response = User::create([
+            'user_id' => (string) Str::uuid(), 
+            'user_type_id' => $data['user_type_id'], 
+            'name' => $data['name'],
+            'phone' => $data['phone'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+        ]);
+        // event(new Registered($user));
+        if ($response)
         {
-            User::create([
-                'user_id' => (string) Str::uuid(), 
-                'user_type_id' => 1, 
-                'name' => $data['name'],
-                'phone' => $data['phone'],
-                'email' => $data['email'],
-                'password' => Hash::make($data['password']),
-            ]);
-
-            // event(new Registered($user));
-
+            Mail::to($data['email'])->send(new Welcome($response));
             return null;
         }
-        catch (\Exception $e) 
+        else
         {
-            return $e->getMessage();
+            return "Failed to create user.";
         }
     }
 
@@ -98,7 +99,6 @@ class UserService
                 'u.name',
                 'u.phone',
                 'u.email',
-                'u.address',
                 'u.is_banned',
                 'u.created_at',
                 'u.updated_at',
@@ -252,7 +252,6 @@ class UserService
                 'u.name',
                 'u.phone',
                 'u.email',
-                'u.address',
                 'u.is_banned',
                 'u.created_at',
                 'u.updated_at',
@@ -263,21 +262,30 @@ class UserService
         return $users;
     }
 
-    public function banUser($id)
+    public function banAndUnUser($id)
     {
         $user = DB::table('users')
             ->where('user_id', $id)
             ->first();
 
+        $is_banned = $this->is_banned($user->email);
         if (!$user) {
             return null; 
         }
-        else {
-            DB::table('users')
-                ->where('user_id', $id)
-                ->update(['is_banned' => true, 'updated_at' => now()]);
 
-            return $this->currentUser($id);
+        else {
+            if ($is_banned) {
+                DB::table('users')
+                    ->where('user_id', $id)
+                    ->update(['is_banned' => false, 'updated_at' => now()]);
+                return false;
+            }
+            else {
+                DB::table('users')
+                    ->where('user_id', $id)
+                    ->update(['is_banned' => true, 'updated_at' => now()]);
+                return true;
+            }
         }
     }
 }

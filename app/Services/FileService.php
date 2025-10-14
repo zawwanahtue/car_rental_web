@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Aws\S3\S3Client;
+use Aws\Exception\AwsException;
 use Illuminate\Http\UploadedFile;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Illuminate\Support\Facades\Storage;
@@ -10,38 +11,54 @@ use Illuminate\Support\Str;
 
 class FileService
 {
+    private S3Client $client;
+
     public function __construct()
     {
+        $key = env('R2_ACCESS_KEY_ID');
+        $secret = env('R2_SECRET_ACCESS_KEY');
+        
+        if (empty($key) || empty($secret)) {
+            throw new \InvalidArgumentException('R2 credentials missing from .env: Check R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY');
+        }
+        
         $this->client = new S3Client([
             'version' => 'latest',
             'region' => 'auto',
             'endpoint' => env('R2_ENDPOINT'), 
             'credentials' => [
-                'key'    => env('R2_ACCESS_KEY_ID'),
-                'secret' => env('R2_SECRET_ACCESS_KEY'),
+                'key'    => $key,
+                'secret' => $secret,
             ],
-            'bucket_endpoint' => false, 
             'use_path_style_endpoint' => true,
             'http' => [
-                'verify' => false, 
+                'verify' => env('APP_ENV') === 'local' ? false : true, 
             ],
         ]);
     }
 
     public function uploadFile($file, $path)
     {
-        $key = $path . uniqid() . '.jpg';
+        $extension = $file->getClientOriginalExtension() ?: 'jpg';  // Fallback to 'jpg' if no extension
+        $key = $path . uniqid() . '.' . $extension;
+
+        $stream = fopen($file->getRealPath(), 'rb');
+        if ($stream === false) {
+            return response()->json(['error' => 'Failed to open file stream'], 500);
+        }
 
         try {
-            $result=$this->client->putObject([
+            $result = $this->client->putObject([
                 'Bucket' => env('R2_BUCKET'),
                 'Key' => $key,
-                'Body' => fopen($file->getRealPath(), 'rb'),
+                'Body' => $stream,
                 'ContentType' => $file->getMimeType(),    
             ]);
 
-        return $key;
+            fclose($stream);  // Close on success
+            return $key;
         } catch (AwsException $e) {
+            fclose($stream);  // Close on error
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
@@ -72,7 +89,8 @@ class FileService
 
             if (isset($result['Contents'])) {
                 foreach ($result['Contents'] as $object) {
-                    $files[] = rtrim(env('R2_URL'), '/') . '/' . $object['Key'];
+                    $baseUrl = rtrim(env('R2_URL', ''), '/');
+                    $files[] = $baseUrl . '/' . $object['Key'];
                 }
             }
 

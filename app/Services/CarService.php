@@ -109,11 +109,6 @@ class CarService
 
     public function deleteCarType($id)
     {
-        $isRelate = $this->commonService->ForeignKeyIsExit("car_types", "car_type_id", $id);
-        if (!$isRelate) {
-            return "Car type have used. Cannot delete.";
-        }
-
         $carType = DB::table('car_type')->where('car_type_id', $id)->first();
         if (!$carType) {
             return "Car type not found.";
@@ -127,8 +122,8 @@ class CarService
             }
         }
         // Delete the photo path record
-        DB::table('photo_paths')->where('photo_path_id', $carType->photo_path_id)->delete();
         DB::table('car_type')->where('car_type_id', $id)->delete();
+        DB::table('photo_paths')->where('photo_path_id', $carType->photo_path_id)->delete();
 
         return null; 
     }
@@ -140,6 +135,7 @@ class CarService
         $cars = DB::table('cars as c')
             ->leftJoin('car_type as ct', 'c.car_type_id', '=', 'ct.car_type_id')
             ->leftJoin('photo_paths as pp', 'c.photo_path_id', '=', 'pp.photo_path_id')
+            ->leftJoin('owners as o', 'c.owner_id', '=', 'o.owner_id')
             ->select(
                 'c.car_id',
                 'ct.type_name as car_type',
@@ -153,6 +149,10 @@ class CarService
                 'c.color',
                 'c.transmission',
                 'c.fuel_type',
+                'c.ownership_condition',
+                'o.name as owner_name',
+                'c.created_at',
+                'c.updated_at',
                 DB::raw("CONCAT('" . env('R2_URL') . "/', pp.photo_path) as car_image_url")
             )
             ->get();
@@ -190,10 +190,12 @@ class CarService
 
     public function updateCar($data)
     {
-        $car = DB::table('cars')->where('car_id', $data['id'])->first();
+        $car = DB::table('cars')->where('car_id', (int)$data['id'])->first();
         if (!$car) {
+            dd($car, $data['id']);
             return "Car not found.";
         }
+
 
         if (isset($data['car_image'])) {
             $existsPhotoPath = $this->alreadyExistsImagePath($car->photo_path_id);
@@ -207,7 +209,7 @@ class CarService
             }
             DB::table('photo_paths')
                 ->where('photo_path_id', $car->photo_path_id)
-                ->update(['photo_path' => $photoPath]);
+                ->update(['photo_path' => $photoPath, 'updated_at' => now()]);
         }
 
         DB::table('cars')->where('car_id', $data['id'])->update([
@@ -238,8 +240,21 @@ class CarService
         if (!$photoDelete) {
             return "Failed to delete old car image.";
         }
+        DB::table('cars')->where('car_id', $car->car_id)->delete();
         DB::table('photo_paths')->where('photo_path_id', $car->photo_path_id)->delete();
-        DB::table('cars')->where('car_id', $id)->delete();
+        return null;
+    }
+
+    public function isCarAvailable($id)
+    {
+        $car = DB::table('cars')->where('car_id', $id)->first();
+        if (!$car) {
+            return "Car not found.";
+        }
+        $isCarAvailable = $car->availability;
+        if ($isCarAvailable == false) {
+            return "Selected car is not available. Please select another car.";
+        }
         return null;
     }
 }

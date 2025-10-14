@@ -20,12 +20,6 @@ class CarController extends Controller
         $this->commonService = $commonService;
     }
 
-    // public function createCar()
-    // {
-    //     // Logic to create a car
-    //     return response()->json(['message' => 'Car created successfully'], 201);
-    // }
-
     ///Car Type
     public function carTypes()
     {
@@ -88,7 +82,7 @@ class CarController extends Controller
     public function deleteCarType($id)
     {
         $isRelated = $this->commonService->ForeignKeyIsExit("cars", "car_type_id", $id);
-        if (!$isRelated) {
+        if ($isRelated) {
             return $this->helper->PostMan(null, 404, "Car type have used. Cannot delete.");
         }
         $carType = $this->carService->deleteCarType($id);
@@ -99,7 +93,6 @@ class CarController extends Controller
     }
 
     ///Car
-
     public function getCars()
     {
         $cars = $this->carService->getCars();
@@ -120,7 +113,7 @@ class CarController extends Controller
             'transmission' => 'required|string|in:auto,manual',
             'fuel_type' =>  'required|string|in:petrol,diesel,electric',
             'car_image' => 'required|image|mimes:jpeg,png,jpg,gif|max:10240',
-            'owner_id' => 'required|integer|exists:owners,owner_id',
+            'owner_id' => 'sometimes|integer|exists:owners,owner_id|nullable',
             'ownership_condition' => 'required|string|in:company_owned,external_owned',
         ];
 
@@ -128,6 +121,7 @@ class CarController extends Controller
         if (is_null($validate))
         {
             $data = $request->all();
+            // dd($data);
             $response = $this->carService->addCar($data);
             if (is_null($response)) {
                 return $this->helper->PostMan(null, 201, "Car Successfully Added");
@@ -155,7 +149,9 @@ class CarController extends Controller
             'transmission' => 'nullable|string|in:auto,manual',
             'fuel_type' =>  'nullable|string|in:petrol,diesel,electric',
             'car_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
-        ];
+            'owner_id' => 'nullable|integer|exists:owners,owner_id',
+            'ownership_condition' => 'nullable|string|in:company_owned,external_owned',
+        ];  
 
         $validate = $this->helper->validate($request, $rule);
         if (is_null($validate))
@@ -178,7 +174,7 @@ class CarController extends Controller
     public function deleteCar($id)
     {
         $isRelated = $this->commonService->ForeignKeyIsExit("bookings", "car_id", $id);
-        $isRelated1 = $this->commonService->ForeignKeyIsExit("maintenances", "car_id", $id);
+        $isRelated1 = $this->commonService->ForeignKeyIsExit("maintenance", "car_id", $id);
         if ($isRelated || $isRelated1) {
             return $this->helper->PostMan(null, 404, "Car have used. Cannot delete.");
         }

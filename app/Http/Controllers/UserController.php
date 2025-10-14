@@ -33,6 +33,38 @@ class UserController extends Controller
         $validate = $this->helper->Validate($request, $rules);
         if(is_null($validate))
         {
+            $data['user_type_id'] = 1;
+            $data = $request->all();
+            $response = $this->userService->register($data);
+                
+            if(is_null($response))
+            {
+                return $this->helper->PostMan(null, 201, "User Account Successfully Created");
+            }
+            else
+            {
+                return $this->helper->PostMan(null, 500, $response);
+            }
+        }
+        else
+        {
+            return $this->helper->PostMan(null, 422, $validate);
+        }
+    }
+
+    public function registerAdmin(Request $request)
+    {
+        $rules = [
+            'user_type_id' => 'required',
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string',
+            'email' => 'required|string|email|max:255|unique:users,email',
+            'password' => 'required|string|min:8|confirmed',
+        ];
+
+        $validate = $this->helper->Validate($request, $rules);
+        if(is_null($validate))
+        {
             $data = $request->all();
             $response = $this->userService->register($data);
                 
@@ -97,7 +129,6 @@ class UserController extends Controller
             'name' => 'sometimes|string|max:255',
             'phone' => 'sometimes|string|regex:/^\+?\d{9,14}$/',
             'email' => 'sometimes|string|email|max:255|unique:users,email,' . Auth::user()->user_id . ',user_id',
-            'address' => 'sometimes|string|max:255',
         ];
 
         $validate = $this->helper->Validate($request, $rules);
@@ -159,11 +190,21 @@ class UserController extends Controller
 
     public function banAndUnbanUser($id)
     {
-        $user = $this->userService->banUser($id);
-        if ($user) {
-            return $this->helper->PostMan($user, 200, "User Banned Successfully");
-        } else {
+        $user = $this->userService->banAndUnUser($id);
+        if(is_null($user))
+        {
             return $this->helper->PostMan(null, 404, "User Not Found");
         }
+        else{
+            if(!$user)
+            {
+                return $this->helper->PostMan(null, 200, "User Unbanned Successfully");
+            }
+            else
+            {
+                return $this->helper->PostMan(null, 200, "User Banned Successfully");
+            }
+        }
     }
+
 }
