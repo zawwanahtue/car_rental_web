@@ -17,7 +17,7 @@ class OwnerController extends Controller
         $this->ownerService = $ownerService;
     }
 
-    public function getOwner() {
+    public function getOwners() {
         $owners = $this->ownerService->getAllOwners();
         if(is_null($owners)) {
             return $this->helper->PostMan(null, 404, "Owners Not Found");
@@ -47,13 +47,13 @@ class OwnerController extends Controller
 
     public function updateOwner(Request $request, $id) {
         $rule = [
-            'name' => 'required|string|max:255',
-            'phone' => 'required|string',
-            'email' => 'required|string|email|max:255|unique:owners,email,' . $id . ',owner_id',
+            'name' => 'sometimes|string|max:255',
+            'phone' => 'sometimes|string',
+            'email' => 'sometimes|string|email|max:255|unique:owners,email,' . $id . ',owner_id',
         ];
         $validate = $this->helper->validate($request, $rule);
         if (is_null($validate)) {
-            $data['owner_id'] = $id;
+            $request['owner_id'] = $id;
             $data = $request->all();
             $response = $this->ownerService->updateOwner($data);
             if (is_null($response)) {

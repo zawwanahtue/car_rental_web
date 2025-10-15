@@ -95,7 +95,7 @@ class UserController extends Controller
             $result = $this->userService->login($request->only('email', 'password'));
 
             if ($result['success'] === false) {
-                return $this->helper->PostMan(null, 401, $result['message']);
+                return $this->helper->PostMan(null, 400, $result['message']);
             }
 
             return $this->helper->PostMan($result, 200, "Successfully Logined");

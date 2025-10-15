@@ -7,14 +7,19 @@ use App\Http\Controllers\ImageController;
 use App\Http\Controllers\CarController;
 use App\Http\Controllers\BookingController;
 use App\Helpers\Helper;
+use App\Http\Controllers\ContactUsController;
+use App\Http\Controllers\OfficeLocationController;
+use App\Http\Controllers\OwnerController;
 use App\Http\Controllers\TestingController;
 
 Route::get('/proxy-image', [ImageController::class, 'proxyImage']);
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/login', [UserController::class, 'login']);
 
+// Contact Us routes
+
 // Office Location routes
-Route::get('/office-locations', [BookingController::class, 'getOfficeLocations']);
+Route::get('/office-locations', [OfficeLocationController::class, 'getOfficeLocations']);
 
 // Car routes 
 Route::get('/cars', [CarController::class, 'getCars']);
@@ -52,15 +57,18 @@ Route::middleware('auth:sanctum')->group(function ()
         Route::get('/bookings', [BookingController::class, 'getBookings']);
 
         // Office Location routes
-        Route::post('/office-location-create', [BookingController::class, 'createOfficeLocation']);
-        Route::post('/office-location-update/{id}', [BookingController::class, 'updateOfficeLocation']);
-        Route::delete('/office-location-delete/{id}', [BookingController::class, 'deleteOfficeLocation']);
+        Route::post('/office-location-create', [OfficeLocationController::class, 'createOfficeLocation']);
+        Route::post('/office-location-update/{id}', [OfficeLocationController::class, 'updateOfficeLocation']);
+        Route::delete('/office-location-delete/{id}', [OfficeLocationController::class, 'deleteOfficeLocation']);
 
         // Owner routes
-        Route::get('/owners', [BookingController::class, 'getOwners']);
-        Route::post('/owner-create', [BookingController::class, 'createOwner']);
-        Route::post('/owner-update/{id}', [BookingController::class, 'updateOwner']);
-        Route::delete('/owner-delete/{id}', [BookingController::class, 'deleteOwner']);
+        Route::get('/owners', [OwnerController::class, 'getOwners']);
+        Route::post('/owner-create', [OwnerController::class, 'createOwner']);
+        Route::post('/owner-update/{id}', [OwnerController::class, 'updateOwner']);
+        Route::delete('/owner-delete/{id}', [OwnerController::class, 'deleteOwner']);
+
+        // Contact Us routes
+        Route::get('/contact-us', [ContactUsController::class, 'getContactUs']);
     });
     
     // User routes
@@ -76,10 +84,6 @@ Route::middleware('auth:sanctum')->group(function ()
     // Booking routes
     Route::get('/bookings/user', [BookingController::class, 'getBookingByUser']);
     Route::post('/booking-create', [BookingController::class, 'createBooking']);
-
-    // Booking type routes
-    Route::get('/booking-types', [BookingController::class, 'getBookingType']);
-
 });
 
 Route::get('/mail', [TestingController::class, 'mail']);

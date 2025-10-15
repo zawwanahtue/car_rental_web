@@ -16,7 +16,7 @@ class OfficeLocationController extends Controller
         $this->officeLocationService = $officeLocationService;
     }
 
-    public function getAllOfficeLocations() {
+    public function getOfficeLocations() {
         $officeLocations = $this->officeLocationService->getAllOfficeLocations();
         if (is_null($officeLocations)) {
             return $this->helper->PostMan(null, 404, "No office locations found");
@@ -28,8 +28,8 @@ class OfficeLocationController extends Controller
     public function createOfficeLocation(Request $request) {
         $rule = [
             'location_name' => 'required|string|max:255',
-            'longitude' => 'required|numberic',
-            'latitude' => 'required|numberic',
+            'longitude' => 'required|numeric',
+            'latitude' => 'required|numeric'
         ];
         $validate = $this->helper->validate($request, $rule);
         if (is_null($validate)) {
@@ -47,13 +47,13 @@ class OfficeLocationController extends Controller
 
     public function updateOfficeLocation(Request $request, $id) {
         $rule = [
-            'location_name' => 'required|string|max:255',
-            'longitude' => 'required|numberic',
-            'latitude' => 'required|numberic',
+            'location_name' => 'sometimes|string|max:255',
+            'longitude' => 'sometimes|numeric',
+            'latitude' => 'sometimes|numeric',
         ];
         $validate = $this->helper->validate($request, $rule);
         if (is_null($validate)) {
-            $data['office_location_id'] = $id;
+            $request['office_location_id'] = $id;
             $data = $request->all();
             $response = $this->officeLocationService->updateOfficeLocation($data);
             if (is_null($response)) {

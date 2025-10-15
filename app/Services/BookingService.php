@@ -47,7 +47,7 @@ class BookingService
         } else {
             $response = DB::table('cars')->where('car_id', $data['car_id'])->update(['availability' => false]);
             if (!$response) {
-                return "Failed to update car availability.";
+                return "This car is not available. Please select another car.";
             }
             return null;
         }

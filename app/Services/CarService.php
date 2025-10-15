@@ -130,9 +130,9 @@ class CarService
     
     ///Car
 
-    public function getCars()
+    public function getCars($data)
     {
-        $cars = DB::table('cars as c')
+        $query = DB::table('cars as c')
             ->leftJoin('car_type as ct', 'c.car_type_id', '=', 'ct.car_type_id')
             ->leftJoin('photo_paths as pp', 'c.photo_path_id', '=', 'pp.photo_path_id')
             ->leftJoin('owners as o', 'c.owner_id', '=', 'o.owner_id')
@@ -155,9 +155,41 @@ class CarService
                 'c.updated_at',
                 DB::raw("CONCAT('" . env('R2_URL') . "/', pp.photo_path) as car_image_url")
             )
-            ->get();
-        return $cars;
+            ->where('c.availability', true); // only available cars
+
+        // Filtering
+        if (!empty($data['car_type_id'])) {
+            $query->where('c.car_type_id', $data['car_type_id']);
+        }
+
+        if (!empty($data['fuel_type'])) {
+            $query->where('c.fuel_type', $data['fuel_type']);
+        }
+
+        // Sorting
+        if (!empty($data['asc']) && $data['asc']==true) {
+            $query->orderBy('c.price_per_day', 'asc');
+        } elseif (!empty($data['asc']) && $data['asc']==false) {
+            $query->orderBy('c.price_per_day', 'desc');
+        } else {
+            $query->orderBy('c.created_at', 'desc');
+        }
+
+        $totalCars = DB::table('cars')->where('availability', true)->count();
+
+        // Pagination
+        $page = max(1, (int)$data['first']); // page number
+        $max = max(1, (int)$data['max']);    // items per page
+        $offset = ($page - 1) * $max;
+
+        $cars = $query->offset($offset)->limit($max)->get();
+
+        return [
+            'cars' => $cars,
+            'totalCars' => $totalCars
+        ];
     }
+
 
     public function addCar(array $data)
     {

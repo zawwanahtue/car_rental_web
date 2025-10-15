@@ -93,9 +93,20 @@ class CarController extends Controller
     }
 
     ///Car
-    public function getCars()
+    public function getCars(Request $request)
     {
-        $cars = $this->carService->getCars();
+        $data['first'] = $request->input('first');     
+        $data['max'] = $request->input('max');
+        $data['asc'] = (bool)$request->boolean('asc');   
+        $data['car_type_id'] = $request->input('car_type_id'); 
+        $data['fuel_type'] = $request->input('fuel_type');
+
+        if (!in_array($data['fuel_type'], ['petrol', 'diesel', 'electric'])) {
+            return $this->helper->PostMan(null, 422, "Fuel Type Invalid");
+        }
+
+        $cars = $this->carService->getCars($data);
+
         return $this->helper->PostMan($cars, 200, "Cars Retrieved Successfully");
     }
 
