@@ -95,19 +95,30 @@ class CarController extends Controller
     ///Car
     public function getCars(Request $request)
     {
-        $data['first'] = $request->input('first');     
-        $data['max'] = $request->input('max');
-        $data['asc'] = (bool)$request->boolean('asc');   
-        $data['car_type_id'] = $request->input('car_type_id'); 
-        $data['fuel_type'] = $request->input('fuel_type');
+        $rule = [
+            'first' => 'required|integer|min:1',
+            'max' => 'required|integer|min:1',
+            'asc' => 'nullable|string|in:false,true',
+            'car_type_id' => 'nullable|integer|exists:car_type,car_type_id',
+            'fuel_type' => 'nullable|string|in:petrol,diesel,electric',
+        ];
 
-        if (!in_array($data['fuel_type'], ['petrol', 'diesel', 'electric'])) {
-            return $this->helper->PostMan(null, 422, "Fuel Type Invalid");
+        $validate = $this->helper->validate($request, $rule); 
+        if (is_null($validate)) {
+            if(isset($request->asc)) { 
+                if($request->asc == "false") {
+                    $request['asc'] = false;
+                } else {
+                    $request['asc'] = true;
+                }
+            }
+            $data = $request->all();
+            $response = $this->carService->getCars($data);
+            return $this->helper->PostMan($response, 200, "Cars Retrieved Successfully");
+
+        } else {
+            return $this->helper->PostMan(null, 422, $validate);
         }
-
-        $cars = $this->carService->getCars($data);
-
-        return $this->helper->PostMan($cars, 200, "Cars Retrieved Successfully");
     }
 
     public function addCar(Request $request)

@@ -1,38 +1,48 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Helpers\Helper;
+use App\Services\CommonService;
 use App\Services\ContactUsService;
 use Illuminate\Http\Request;
 
 class ContactUsController extends Controller
 {
-    protected $helper;
     protected $contactUsService;
-    public function index(Helper $helper, ContactUsService $contactUsService)
-    { 
+    protected $helper;
+    protected $commonService;
+
+    public function __construct(ContactUsService $contactUsService, Helper $helper, CommonService $commonService)
+    {
         $this->helper = $helper;
+        $this->commonService = $commonService;
         $this->contactUsService = $contactUsService;
     }
 
-    public function getContactUs()
-    {
-        $contactUs = $this->contactUsService->getContactUs();
-        if(!$contactUs) {
-            return $this->helper->PostMan(null, 404, $contactUs);
+    public function getContactUs() {
+        $response = $this->contactUsService->getContactUs();
+        return $this->helper->PostMan($response, 200, "Contact us retrieved successfully");
+    }
+
+    public function createContactUs(Request $request) {
+        $rule = [
+            'title' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255',
+            'phone' => 'required|string',
+            'description' => 'required|string'
+        ];
+        $validate = $this->helper->validate($request, $rule);
+        if (is_null($validate)) {
+            $data = $request->all();
+            $response = $this->contactUsService->createContactUs($data);
+            if (is_null($response)) {
+                return $this->helper->PostMan(null, 201, "Contact us successfully created");
+            } else {
+                return $this->helper->PostMan(null, 500, $response);
+            }
+        } else {
+            return $this->helper->PostMan(null, 422, $validate);
         }
-        return $this->helper->PostMan($contactUs, 200, "Contact Us Retrieved Successfully");
-    }
-
-    public function createContactUs(Request $request)
-    {
-    }
-
-    public function updateContactUs(Request $request)
-    {
-    }  
-
-    public function deleteContactUs(Request $request)
-    {
     }
 }

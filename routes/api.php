@@ -1,12 +1,10 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\CarController;
 use App\Http\Controllers\BookingController;
-use App\Helpers\Helper;
 use App\Http\Controllers\ContactUsController;
 use App\Http\Controllers\OfficeLocationController;
 use App\Http\Controllers\OwnerController;
@@ -15,6 +13,7 @@ use App\Http\Controllers\TestingController;
 Route::get('/proxy-image', [ImageController::class, 'proxyImage']);
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/login', [UserController::class, 'login']);
+Route::post('/contact-us-create', [ContactUsController::class, 'createContactUs']);
 
 // Contact Us routes
 
@@ -24,7 +23,7 @@ Route::get('/office-locations', [OfficeLocationController::class, 'getOfficeLoca
 // Car routes 
 Route::get('/cars', [CarController::class, 'getCars']);
 
-Route::middleware('auth:sanctum')->group(function () 
+Route::middleware('auth:sanctum')->group(function ()
 {
     // User routes
     Route::middleware('user_type:1')->prefix('/user')->group(function (){

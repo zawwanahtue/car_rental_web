@@ -4,7 +4,6 @@ namespace App\Services;
 use App\Services\FileService;
 use App\Services\CommonService;
 use Illuminate\Support\Facades\DB;
-use Termwind\Components\Raw;
 
 class CarService
 {
@@ -129,9 +128,8 @@ class CarService
     }
     
     ///Car
-
     public function getCars($data)
-    {
+    { 
         $query = DB::table('cars as c')
             ->leftJoin('car_type as ct', 'c.car_type_id', '=', 'ct.car_type_id')
             ->leftJoin('photo_paths as pp', 'c.photo_path_id', '=', 'pp.photo_path_id')
@@ -164,15 +162,12 @@ class CarService
 
         if (!empty($data['fuel_type'])) {
             $query->where('c.fuel_type', $data['fuel_type']);
-        }
+        } 
 
         // Sorting
-        if (!empty($data['asc']) && $data['asc']==true) {
-            $query->orderBy('c.price_per_day', 'asc');
-        } elseif (!empty($data['asc']) && $data['asc']==false) {
-            $query->orderBy('c.price_per_day', 'desc');
-        } else {
-            $query->orderBy('c.created_at', 'desc');
+        if (isset($data['asc'])) { // Use isset since `asc` can be explicitly false (0) 
+            $direction = !$data['asc'] ? 'desc' : 'asc';
+            $query->orderBy('c.price_per_day', $direction);
         }
 
         $totalCars = DB::table('cars')->where('availability', true)->count();

@@ -53,7 +53,7 @@ class BookingController extends Controller
             if (is_null($response)) {
                 return $this->helper->PostMan(null, 201, "Booking Successfully Created");
             } else {
-                return $this->helper->PostMan(null, 500, $response);
+                return $this->helper->PostMan(null, 400, $response);
             }
         } 
         else 
