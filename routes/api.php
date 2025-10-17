@@ -35,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function ()
         Route::get('/user-list', [UserController::class, 'userList']);
         Route::get('/ban-user/{id}', [UserController::class, 'banAndUnbanUser']);
         Route::post('/admin-register', [UserController::class, 'registerAdmin']);
+        Route::get('/password-reset/{id}', [UserController::class, 'passwordReset']);
 
         // Car routes
         Route::post('/car-create', [CarController::class, 'addCar']);

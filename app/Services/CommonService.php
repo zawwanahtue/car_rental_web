@@ -4,6 +4,8 @@ namespace App\Services;
 use App\Services\FileService;
 use Illuminate\Support\Facades\DB;
 use Termwind\Components\Raw;
+use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class CommonService
 {
@@ -37,6 +39,13 @@ class CommonService
         return $ticketNumber;
     }
 
-    public function paginationAndFilter() {
+    public function timeStampTypeCaster($date, $time) {
+        $dateTime = $date . ' ' . $time;
+        return $dateTime;
+    }
+
+    public function passwordGenerate() {
+        $password = Str::random(20);
+        return $password;
     }
 }

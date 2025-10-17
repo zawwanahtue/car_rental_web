@@ -35,6 +35,9 @@ class BookingController extends Controller
 
     public function createBooking(Request $request)
     {
+        $pickup_datetime = $this->commonService->timeStampTypeCaster($request->pickup_date, $request->pickup_time);
+        $dropoff_datetime = $this->commonService->timeStampTypeCaster($request->dropoff_date, $request->dropoff_time);
+        $request->merge(['pickup_datetime' => $pickup_datetime, 'dropoff_datetime' => $dropoff_datetime]);
         $rules = [
             'car_id' => 'required|integer|exists:cars,car_id',
             'pickup_datetime' => 'required|date|after:now',
@@ -48,7 +51,15 @@ class BookingController extends Controller
         if (is_null($validate))
         {
             $data['user_id'] = Auth::user()->user_id;
-            $data = $request->all();
+            $data = $request->only([
+                'car_id', 
+                'pickup_datetime', 
+                'dropoff_datetime', 
+                'pickup_latitude', 
+                'pickup_longitude', 
+                'dropoff_latitude', 
+                'dropoff_longitude'
+            ]);
             $response = $this->bookingService->createBooking($data);
             if (is_null($response)) {
                 return $this->helper->PostMan(null, 201, "Booking Successfully Created");

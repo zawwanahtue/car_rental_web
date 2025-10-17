@@ -7,18 +7,21 @@ use App\Services\UserService;
 use App\Services\FileService;
 use Illuminate\Support\Facades\Auth;
 use App\Helpers\Helper;
+use App\Services\CommonService;
 
 class UserController extends Controller
 {
     protected $userService;
     protected $fileService;
     protected $helper;
+    protected $commonService;
 
-    public function __construct(UserService $userService, FileService $fileService, Helper $helper)
+    public function __construct(UserService $userService, FileService $fileService, Helper $helper, CommonService $commonService)
     {
         $this->userService = $userService;
         $this->fileService = $fileService;
         $this->helper = $helper;
+        $this->commonService = $commonService;
     }
 
     public function register(Request $request)
@@ -55,7 +58,7 @@ class UserController extends Controller
     public function registerAdmin(Request $request)
     {
         $rules = [
-            'user_type_id' => 'required',
+            'user_type_id' => 'required|integer|exists:user_type,user_type_id',
             'name' => 'required|string|max:255',
             'phone' => 'required|string',
             'email' => 'required|string|email|max:255|unique:users,email',
@@ -207,4 +210,18 @@ class UserController extends Controller
         }
     }
 
+    public function passwordReset($id)
+    {
+        // $user = $this->userService->passwordReset($id);
+        // if(is_null($user))
+        // {
+        //     return $this->helper->PostMan(null, 404, "User Not Found");
+        // }
+        // else
+        // {
+        //     return $this->helper->PostMan(null, 200, "Password Reset Successfully");
+        // }
+        $password = $this->commonService->passwordGenerate($id);
+        return $this->helper->PostMan(null, 200, $password); 
+    }
 }

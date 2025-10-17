@@ -15,10 +15,12 @@ use App\Mail\Welcome;
 class UserService
 {
     protected $fileService;
+    protected $commonService;
     
-    public function __construct(FileService $fileService)
+    public function __construct(FileService $fileService, CommonService $commonService)
     {
         $this->fileService = $fileService;
+        $this->commonService = $commonService;
     }
 
     public function register(array $data)
@@ -287,5 +289,12 @@ class UserService
                 return true;
             }
         }
+    }
+
+    public function passwordReset($id) {
+        $user = DB::table('users')
+            ->where('user_id', $id)
+            ->update(['password' => Hash::make('password'), 'updated_at' => now()]);
+        return $user;
     }
 }
