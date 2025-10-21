@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Services\CarService;
 use App\Helpers\Helper;
 use App\Services\CommonService;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Validator;
 
 class CarController extends Controller
 {
@@ -95,30 +97,58 @@ class CarController extends Controller
     ///Car
     public function getCars(Request $request)
     {
-        $rule = [
+        // Validation rules
+        $rules = [
             'first' => 'required|integer|min:1',
             'max' => 'required|integer|min:1',
-            'asc' => 'nullable|string|in:false,true',
+            'pickup_datetime'  => 'nullable|date|required_with:dropoff_datetime',
+            'dropoff_datetime' => 'nullable|date|required_with:pickup_datetime',
+            'asc_total' => 'nullable|string|in:false,true',
+            'asc_hour'  => 'nullable|string|in:false,true',
+            'asc_day'   => 'nullable|string|in:false,true',
             'car_type_id' => 'nullable|integer|exists:car_type,car_type_id',
-            'fuel_type' => 'nullable|string|in:petrol,diesel,electric',
+            'fuel_type'   => 'nullable|string|in:petrol,diesel,electric',
         ];
 
-        $validate = $this->helper->validate($request, $rule); 
-        if (is_null($validate)) {
-            if(isset($request->asc)) { 
-                if($request->asc == "false") {
-                    $request['asc'] = false;
-                } else {
-                    $request['asc'] = true;
+        $validator = Validator::make($request->all(), $rules);
+
+        // Custom rules
+        $validator->after(function ($validator) use ($request) {
+            $ascFields = ['asc_total', 'asc_hour', 'asc_day'];
+            $filledAsc = array_filter($ascFields, fn($f) => !empty($request->$f));
+
+            // Only one asc field allowed
+            if (count($filledAsc) > 1) {
+                $validator->errors()->add('asc','Only one of asc_total, asc_hour, or asc_day can be provided.');
+            }
+
+            // If asc_total is provided → require pickup/dropoff
+            if (!empty($request->asc_total) && $request->asc_total !== null) {
+                if (empty($request->pickup_datetime) || empty($request->dropoff_datetime)) {
+                    $validator->errors()->add('date', 'pickup_datetime and dropoff_datetime are required when sorting by total_price.');
                 }
             }
-            $data = $request->all();
-            $response = $this->carService->getCars($data);
-            return $this->helper->PostMan($response, 200, "Cars Retrieved Successfully");
+        });
 
-        } else {
-            return $this->helper->PostMan(null, 422, $validate);
+        // Check validation
+        if ($validator->fails()) {
+            return $this->helper->PostMan(null, 422, $validator->errors()->first());
         }
+
+        // Calculate total rental time in hours
+        $totalHours = null;
+        if (!empty($request->pickup_datetime) && !empty($request->dropoff_datetime)) {
+            $pickup  = Carbon::parse($request->pickup_datetime);
+            $dropoff = Carbon::parse($request->dropoff_datetime);
+            $totalHours = round($pickup->floatDiffInHours($dropoff), 2);
+        }
+
+        $data = $request->all();
+        $data['total_hours'] = $totalHours;
+
+        $response = $this->carService->getCars($data);
+
+        return $this->helper->PostMan($response, 200, "Cars Retrieved Successfully");
     }
 
     public function addCar(Request $request)

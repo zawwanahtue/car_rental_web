@@ -129,7 +129,7 @@ class CarService
     
     ///Car
     public function getCars($data)
-    { 
+    {
         $query = DB::table('cars as c')
             ->leftJoin('car_type as ct', 'c.car_type_id', '=', 'ct.car_type_id')
             ->leftJoin('photo_paths as pp', 'c.photo_path_id', '=', 'pp.photo_path_id')
@@ -138,6 +138,7 @@ class CarService
                 'c.car_id',
                 'ct.type_name as car_type',
                 'c.model',
+                'c.description',
                 'c.license_plate',
                 'c.price_per_hour',
                 'c.price_per_day',
@@ -153,38 +154,60 @@ class CarService
                 'c.updated_at',
                 DB::raw("CONCAT('" . env('R2_URL') . "/', pp.photo_path) as car_image_url")
             )
-            ->where('c.availability', true); // only available cars
+            ->where('c.availability', true);
 
         // Filtering
         if (!empty($data['car_type_id'])) {
             $query->where('c.car_type_id', $data['car_type_id']);
         }
-
         if (!empty($data['fuel_type'])) {
             $query->where('c.fuel_type', $data['fuel_type']);
-        } 
-
-        // Sorting
-        if (isset($data['asc'])) { // Use isset since `asc` can be explicitly false (0) 
-            $direction = !$data['asc'] ? 'desc' : 'asc';
-            $query->orderBy('c.price_per_day', $direction);
         }
 
         $totalCars = DB::table('cars')->where('availability', true)->count();
 
         // Pagination
-        $page = max(1, (int)$data['first']); // page number
-        $max = max(1, (int)$data['max']);    // items per page
+        $page = max(1, (int)$data['first']);
+        $max = max(1, (int)$data['max']);
         $offset = ($page - 1) * $max;
 
         $cars = $query->offset($offset)->limit($max)->get();
+
+        // Add total_price if total_hours exists
+        if (!empty($data['total_hours'])) {
+            $cars->transform(function ($car) use ($data) {
+                $hours = (float) $data['total_hours'];
+
+                if ($hours < 24) {
+                    $car->total_price = round($hours * $car->price_per_hour, 2);
+                } else {
+                    $days = floor($hours / 24);
+                    $remainingHours = round($hours - ($days * 24), 2);
+                    $car->total_price = round(($days * $car->price_per_day) + ($remainingHours * $car->price_per_hour), 2);
+                }
+
+                return $car;
+            });
+        }
+
+        // Dynamic sorting
+        if (!empty($data['asc_total'])) {
+            $asc = $data['asc_total'] === "true";
+            $cars = $cars->sortBy('total_price', SORT_REGULAR, !$asc)->values();
+        } elseif (!empty($data['asc_hour'])) {
+            $asc = $data['asc_hour'] === "true";
+            $cars = $cars->sortBy('price_per_hour', SORT_REGULAR, !$asc)->values();
+        } elseif (!empty($data['asc_day'])) {
+            $asc = $data['asc_day'] === "true";
+            $cars = $cars->sortBy('price_per_day', SORT_REGULAR, !$asc)->values();
+        }
+        // Else: no sorting, keep original DB order
 
         return [
             'cars' => $cars,
             'totalCars' => $totalCars
         ];
     }
-
 
     public function addCar(array $data)
     {
