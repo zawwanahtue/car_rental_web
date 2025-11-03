@@ -184,6 +184,7 @@ class UserController extends Controller
     public function userList(Request $request) 
     {
         $rule = [
+            'search_by' => 'nullable|string|max:255',
             'first' => 'required|integer|min:1',
             'max' => 'required|integer|min:1',
             'filter_by' => 'nullable|string|in:user,banned_user,active_user,admin,staff',
@@ -229,5 +230,13 @@ class UserController extends Controller
         {
             return $this->helper->PostMan(null, 500, $user);
         }
+    }
+
+    public function isHaveFines()
+    {   
+        $user_id = Auth::user()->user_id;
+        $hasFines = $this->userService->isHaveFines($user_id);
+
+        return $this->helper->PostMan($hasFines, 200, "Fines Status Retrieved Successfully");
     }
 }

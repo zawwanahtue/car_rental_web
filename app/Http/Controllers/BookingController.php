@@ -40,12 +40,15 @@ class BookingController extends Controller
         $request->merge(['pickup_datetime' => $pickup_datetime, 'dropoff_datetime' => $dropoff_datetime]);
         $rules = [
             'car_id' => 'required|integer|exists:cars,car_id',
-            'pickup_datetime' => 'required|date|after:now',
+            'pickup_datetime' => 'required|date|after_or_equal:' . now()->addHours(24)->format('Y-m-d H:i:s'),
             'dropoff_datetime' => 'required|date|after:pickup_datetime',
             'pickup_latitude' => 'required|numeric',
             'pickup_longitude' => 'required|numeric',
             'dropoff_latitude' => 'required|numeric',
-            'dropoff_longitude' => 'required|numeric'
+            'dropoff_longitude' => 'required|numeric',
+            'total_amount' => 'required|numeric|min:0',
+            'cancellation_fine' => 'nullable|numeric|min:0',
+            'no_show_fine' => 'nullable|numeric|min:0'
         ];
         $validate = $this->helper->validate($request, $rules);
         if (is_null($validate))
@@ -58,7 +61,10 @@ class BookingController extends Controller
                 'pickup_latitude', 
                 'pickup_longitude', 
                 'dropoff_latitude', 
-                'dropoff_longitude'
+                'dropoff_longitude',
+                'total_amount',
+                'cancellation_fine',
+                'no_show_fine'
             ]);
             $response = $this->bookingService->createBooking($data);
             if (is_null($response)) {
@@ -99,16 +105,20 @@ class BookingController extends Controller
         }
     }
 
-    public function deleteBooking($id)
+    public function getCustomerPickupBookings()
     {
-        // Logic to delete a booking
-        return response()->json(['message' => 'Booking deleted successfully'], 200);
+        $bookings = $this->bookingService->getCustomerPickupBookings();
+        return $this->helper->PostMan($bookings, 200, "Customer Pickup Bookings Retrieved Successfully");
     }
 
-
-    public function cancelBooking(Request $request, $id)
+    public function cancelBooking($id)
     {
-        // Logic to cancel a booking
-        return response()->json(['message' => 'Booking cancelled successfully'], 200);
+        $user_id = Auth::user()->user_id;
+        $response = $this->bookingService->cancelBooking($id, $user_id);
+        if (is_null($response)) {
+            return $this->helper->PostMan(null, 200, "Booking Successfully Cancelled");
+        } else {
+            return $this->helper->PostMan(null, 500, $response);
+        }
     }
 }

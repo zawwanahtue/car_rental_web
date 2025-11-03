@@ -51,4 +51,32 @@ class OfficeLocationService{
         }
         return null;
     }
+
+    public function isOfficeLocation($data)
+    {
+        $officeLocation = DB::table('office_locations')->first();
+
+        if ($officeLocation) {
+            $radius = 0.5;
+
+            $lat1 = deg2rad($officeLocation->latitude);
+            $lon1 = deg2rad($officeLocation->longitude);
+            $lat2 = deg2rad($data['latitude']);
+            $lon2 = deg2rad($data['longitude']);
+
+            $dlat = $lat2 - $lat1;
+            $dlon = $lon2 - $lon1;
+
+            $a = sin($dlat / 2) * sin($dlat / 2) +
+                cos($lat1) * cos($lat2) *
+                sin($dlon / 2) * sin($dlon / 2);
+            $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+            $earthRadius = 6371; 
+            $distance = $earthRadius * $c; 
+
+            return $distance <= $radius;
+        }
+
+        return false; 
+    }
 }

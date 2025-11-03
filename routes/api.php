@@ -71,6 +71,7 @@ Route::middleware('auth:sanctum')->group(function ()
     Route::post('/upload&update-profile-image', [UserController::class, 'profileImageRequest']);
     Route::delete('/delete-profile-image', [UserController::class, 'deleteProfileImage']);
     Route::put('/update-profile', [UserController::class, 'updateUser']);
+    Route::get('/is-have-fines', [UserController::class, 'isHaveFines']);
 
     // Car routes 
     Route::get('/cars', [CarController::class, 'getCars']);
@@ -81,11 +82,13 @@ Route::middleware('auth:sanctum')->group(function ()
     // Booking routes
     Route::get('/bookings/user', [BookingController::class, 'getBookingByUser']);
     Route::post('/booking-create', [BookingController::class, 'createBooking']);
+    Route::get('/booking-cancel/{id}', [BookingController::class, 'cancelBooking']);
         
     // Office Location routes
     Route::get('/office-locations', [OfficeLocationController::class, 'getOfficeLocations']);
 });
 
 Route::get('/mail', [TestingController::class, 'mail']);
+
 
 //// testing route

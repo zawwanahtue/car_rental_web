@@ -262,6 +262,15 @@ class UserService
                 DB::raw("CONCAT('" . env('R2_URL') . "/', pp.photo_path) as profile_image_url")
             );
 
+        if (!empty($data['search_by'])) {
+            $searchTerm = '%' . $data['search_by'] . '%'; 
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('u.name', 'LIKE', $searchTerm)
+                ->orWhere('u.email', 'LIKE', $searchTerm)
+                ->orWhere('u.phone', 'LIKE', $searchTerm); 
+            });
+        }
+
         if (!empty($data['filter_by'])) {
             if ($data['filter_by'] == 'user') {
                 $query->where('ut.type_name', 'user');
@@ -357,5 +366,21 @@ class UserService
         }
         Mail::to($user->email)->send(new PasswordReset($user->name, $password));
         return null;
+    }
+
+    public function isHaveFines($user_id)
+    {
+        $data = DB::table('users')
+            ->where('user_id', $user_id)
+            ->first();
+
+        $no_show = $data->no_show_count * 10000;
+        $cancellation = $data->cancellation_count * 30000;
+
+        return $data = [
+            'No-show Fine' => $no_show,
+            'Cancellation Fine' => $cancellation,
+            'Total Fine' => $no_show + $cancellation
+        ];
     }
 }
