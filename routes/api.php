@@ -8,7 +8,9 @@ use App\Http\Controllers\BookingController;
 use App\Http\Controllers\ContactUsController;
 use App\Http\Controllers\OfficeLocationController;
 use App\Http\Controllers\OwnerController;
+use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\TestingController;
+use App\Services\ReviewService;
 
 Route::get('/proxy-image', [ImageController::class, 'proxyImage']);
 Route::post('/register', [UserController::class, 'register']);
@@ -27,12 +29,15 @@ Route::middleware('auth:sanctum')->group(function ()
 {
     // User routes
     Route::middleware('user_type:1')->prefix('/user')->group(function (){
-        
+        // Review routes
+        Route::post('/review-create', [ReviewController::class, 'submitReview']);
+        Route::get('/my-bookings', [BookingController::class, 'getBookingByUser']);
     });
 
     // Staff routes
     Route::middleware('user_type:2')->prefix('/staff')->group(function (){
-        // Route::get('/users', [UserController::class, 'getAllUsers']);
+        // Booking routes
+        Route::get('/today-deliveries', [BookingController::class, 'getTodayDeliveries']);
     });
     
     // Admin routes
@@ -69,6 +74,9 @@ Route::middleware('auth:sanctum')->group(function ()
 
         // Contact Us routes
         Route::get('/contact-us', [ContactUsController::class, 'getContactUs']);
+
+        // Review routes
+        Route::get('/reviews', [ReviewController::class, 'getAdminReviews']);
     });
     
     // User routes

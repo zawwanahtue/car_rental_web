@@ -1,22 +1,17 @@
 <?php
+
 namespace App\Services;
 
-use App\Services\CommonService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
-use App\Services\OfficeLocationService;
+use App\Services\CommonService;
 
 class BookingService
 {
     protected $commonService;
-    protected $carService;
-    protected $officeLocationService;
-
-    public function __construct(CommonService $commonService, CarService $carService, OfficeLocationService $officeLocationService)
+    public function __construct(CommonService $commonService)
     {
         $this->commonService = $commonService;
-        $this->carService = $carService;
-        $this->officeLocationService = $officeLocationService;
     }
 
     public function getAllBookings($data, $user)
@@ -26,84 +21,123 @@ class BookingService
             ->leftJoin('cars as c', 'b.car_id', '=', 'c.car_id')
             ->leftJoin('car_type as ct', 'c.car_type_id', '=', 'ct.car_type_id')
             ->leftJoin('office_locations as ol', 'c.office_location_id', '=', 'ol.office_location_id')
+            ->leftJoin('reviews as r', 'b.booking_id', '=', 'r.booking_id')
             ->select(
-                'b.booking_id',
-                'b.ticket_number',
-                'b.user_id',
-                'u.name as customer_name',
-                'u.phone as customer_phone',
-                'b.car_id',
-                'c.model as car_model',
-                'c.license_plate',
-                'ct.type_name as car_type',
-                'ol.location_name as office',
-                'b.pickup_datetime',
-                'b.dropoff_datetime',
-                'b.pickup_latitude',
-                'b.pickup_longitude',
-                'b.dropoff_latitude',
-                'b.dropoff_longitude',
-                'b.total_amount',
-                'b.cancellation_fine',
-                'b.no_show_fine',
-                'b.booking_status',
-                'b.deliver_need',
-                'b.take_back_need',
-                'b.created_at',
-                'b.updated_at'
-            );
+                'b.booking_id', 'b.ticket_number', 'b.user_id', 'u.name as customer_name',
+                'u.phone as customer_phone', 'b.car_id', 'c.model as car_model',
+                'c.license_plate', 'ct.type_name as car_type', 'ol.location_name as office',
+                'b.pickup_datetime', 'b.dropoff_datetime', 'b.pickup_latitude', 'b.pickup_longitude',
+                'b.dropoff_latitude', 'b.dropoff_longitude', 'b.total_amount',
+                'b.cancellation_fine', 'b.no_show_fine', 'b.booking_status',
+                'b.deliver_need', 'b.take_back_need', 'b.created_at', 'b.updated_at',
+                DB::raw('COALESCE(AVG(r.rating), 0) as average_rating'),
+                DB::raw('COUNT(r.review_id) as review_count')
+            )
+            ->groupBy('b.booking_id');
 
+        $countQuery = clone $query;
+
+        // === STAFF FILTER: Only their office ===
         if ($user->user_type_id != 3) {
             $query->where(function ($q) use ($user) {
-                $q->where('b.deliver_need', 1)
-                ->orWhere('b.take_back_need', 1)
+                $q->where('b.delivery_office_id', $user->office_location_id)
+                ->orWhere('b.takeback_office_id', $user->office_location_id)
+                ->orWhere('b.complete_by', $user->user_id);
+            });
+            $countQuery->where(function ($q) use ($user) {
+                $q->where('b.delivery_office_id', $user->office_location_id)
+                ->orWhere('b.takeback_office_id', $user->office_location_id)
                 ->orWhere('b.complete_by', $user->user_id);
             });
         }
 
-        $baseQuery = clone $query;
-
+        // === SEARCH ===
         if (!empty($data['search_by'])) {
-            $searchTerm = '%' . $data['search_by'] . '%';
-            $query->where(function ($q) use ($searchTerm) {
-                $q->where('b.ticket_number', 'LIKE', $searchTerm)
-                ->orWhere('u.name', 'LIKE', $searchTerm)
-                ->orWhere('c.model', 'LIKE', $searchTerm);
+            $term = '%' . $data['search_by'] . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('b.ticket_number', 'LIKE', $term)
+                ->orWhere('u.name', 'LIKE', $term)
+                ->orWhere('c.model', 'LIKE', $term)
+                ->orWhere('c.license_plate', 'LIKE', $term);
             });
-            $baseQuery->where(function ($q) use ($searchTerm) {
-                $q->where('b.ticket_number', 'LIKE', $searchTerm)
-                ->orWhere('u.name', 'LIKE', $searchTerm)
-                ->orWhere('c.model', 'LIKE', $searchTerm);
+            $countQuery->where(function ($q) use ($term) {
+                $q->where('b.ticket_number', 'LIKE', $term)
+                ->orWhere('u.name', 'LIKE', $term)
+                ->orWhere('c.model', 'LIKE', $term)
+                ->orWhere('c.license_plate', 'LIKE', $term);
             });
         }
 
-        if (!empty($data['filter_by'])) {
-            if (in_array($data['filter_by'], ['pending', 'confirmed', 'cancelled', 'completed'])) {
-                $query->where('b.booking_status', $data['filter_by']);
-                $baseQuery->where('b.booking_status', $data['filter_by']);
-            } elseif ($data['filter_by'] == 'needs_delivery') {
-                $query->where('b.deliver_need', 1);
-                $baseQuery->where('b.deliver_need', 1);
-            } elseif ($data['filter_by'] == 'needs_takeback') {
-                $query->where('b.take_back_need', 1);
-                $baseQuery->where('b.take_back_need', 1);
-            }
+        // === FILTERS ===
+        if (!empty($data['status'])) {
+            $query->where('b.booking_status', $data['status']);
+            $countQuery->where('b.booking_status', $data['status']);
         }
 
-        $totalBookings = $baseQuery->count();
-        $totalAmount = $baseQuery->sum('b.total_amount');
+        if (isset($data['delivery'])) {
+            $query->where('b.deliver_need', $data['delivery']);
+            $countQuery->where('b.deliver_need', $data['delivery']);
+        }
 
-        $page = max(1, (int)$data['first']);
-        $max = max(1, (int)$data['max']);
-        $offset = ($page - 1) * $max;
+        if (isset($data['takeback'])) {
+            $query->where('b.take_back_need', $data['takeback']);
+            $countQuery->where('b.take_back_need', $data['takeback']);
+        }
 
-        $bookings = $query->offset($offset)->limit($max)->orderByDesc('b.created_at')->get();
+        if (!empty($data['office_id'])) {
+            $query->where(function ($q) use ($data) {
+                $q->where('b.delivery_office_id', $data['office_id'])
+                ->orWhere('b.takeback_office_id', $data['office_id']);
+            });
+            $countQuery->where(function ($q) use ($data) {
+                $q->where('b.delivery_office_id', $data['office_id'])
+                ->orWhere('b.takeback_office_id', $data['office_id']);
+            });
+        }
 
-        $bookings->transform(function ($booking) {
-            $booking->total_amount = (float)$booking->total_amount;
-            $booking->cancellation_fine = (float)$booking->cancellation_fine;
-            $booking->no_show_fine = (float)$booking->no_show_fine;
-            return $booking;
+        if (!empty($data['car_type_id'])) {
+            $query->where('c.car_type_id', $data['car_type_id']);
+            $countQuery->where('c.car_type_id', $data['car_type_id']);
+        }
+
+        if (!empty($data['date_from'])) {
+            $query->whereDate('b.pickup_datetime', '>=', $data['date_from']);
+            $countQuery->whereDate('b.pickup_datetime', '>=', $data['date_from']);
+        }
+
+        if (!empty($data['date_to'])) {
+            $query->whereDate('b.pickup_datetime', '<=', $data['date_to']);
+            $countQuery->whereDate('b.pickup_datetime', '<=', $data['date_to']);
+        }
+
+        // === SORTING ===
+        $sortBy = $data['sort_by'] ?? 'created_at';
+        $sort   = in_array($data['sort'] ?? '', ['asc', 'desc']) ? $data['sort'] : 'desc';
+
+        if ($sortBy === 'average_rating') {
+            $query->orderByRaw("COALESCE(AVG(r.rating), 0) $sort");
+        } else {
+            $query->orderBy("b.$sortBy", $sort);
+        }
+
+        // === COUNTS ===
+        $totalBookings = $countQuery->count();
+        $totalAmount   = $countQuery->sum('b.total_amount');
+
+        // === PAGINATION ===
+        $page    = max(1, (int)($data['first'] ?? 1));
+        $perPage = max(1, (int)($data['max'] ?? 10));
+        $offset  = ($page - 1) * $perPage;
+
+        $bookings = $query->offset($offset)->limit($perPage)->get();
+
+        $bookings->transform(function ($b) {
+            $b->total_amount = (float)$b->total_amount;
+            $b->cancellation_fine = (float)$b->cancellation_fine;
+            $b->no_show_fine = (float)$b->no_show_fine;
+            $b->average_rating = round((float)$b->average_rating, 1);
+            $b->review_count = (int)$b->review_count;
+            return $b;
         });
 
         return [
@@ -112,80 +146,121 @@ class BookingService
             'total_amount' => (float)$totalAmount,
             'pagination' => [
                 'current_page' => $page,
-                'per_page' => $max,
+                'per_page' => $perPage,
                 'from' => $offset + 1,
-                'to' => min($offset + $max, $totalBookings),
-                'last_page' => ceil($totalBookings / $max)
+                'to' => min($offset + $perPage, $totalBookings),
+                'last_page' => ceil($totalBookings / $perPage)
             ]
         ];
     }
 
     public function getBookingsByUser()
     {
-        $id = Auth::user()->user_id;
-        $bookings = DB::table('bookings')->where('user_id', $id)->get();
-        if (!$bookings) {
-            return "No bookings found.";
-        }
-        return $bookings;
+        $userId = Auth::id();
+
+        $bookings = DB::table('bookings as b')
+            ->leftJoin('reviews as r', function ($join) use ($userId) {
+                $join->on('r.booking_id', '=', 'b.booking_id')
+                    ->where('r.user_id', '=', $userId);
+            })
+            ->leftJoin('cars as c', 'b.car_id', '=', 'c.car_id')
+            ->leftJoin('car_type as ct', 'c.car_type_id', '=', 'ct.car_type_id')
+            ->select(
+                'b.*',
+                'c.model',
+                'c.license_plate',
+                'ct.type_name',
+                DB::raw('r.review_id'),                     // keep for has_reviewed
+                DB::raw('IF(r.review_id IS NOT NULL, 1, 0) as has_reviewed'),
+                DB::raw('COALESCE(AVG(r.rating), 0) as average_rating')
+            )
+            ->where('b.user_id', $userId)
+            ->groupBy(
+                'b.booking_id',
+                'b.ticket_number',
+                'b.user_id',
+                'b.car_id',
+                'b.pickup_datetime',
+                'b.dropoff_datetime',
+                'b.pickup_latitude',
+                'b.pickup_longitude',
+                'b.dropoff_latitude',
+                'b.dropoff_longitude',
+                'b.total_amount',
+                'b.booking_status',
+                'b.deliver_need',
+                'b.take_back_need',
+                'b.delivery_office_id',
+                'b.takeback_office_id',
+                'b.cancellation_fine',
+                'b.no_show_fine',
+                'b.created_at',
+                'b.updated_at',
+                'c.model',
+                'c.license_plate',
+                'ct.type_name',
+                'r.review_id'
+            )
+            ->orderByDesc('b.created_at')
+            ->get();
+
+        return $bookings->isEmpty() ? [] : $bookings->toArray();
     }
 
     public function createBooking($data)
     {
-        $pickupLocationData = [
-            'latitude' => $data['pickup_latitude'],
-            'longitude' => $data['pickup_longitude']
-        ];
-        $dropoffLocationData = [
-            'latitude' => $data['dropoff_latitude'],
-            'longitude' => $data['dropoff_longitude']
-        ];
-        $data['deliver_need'] = $this->officeLocationService->isOfficeLocation($pickupLocationData);
-        $data['take_back_need'] = $this->officeLocationService->isOfficeLocation($dropoffLocationData);
         $data['ticket_number'] = $this->commonService->getTicketNumber();
         $data['user_id'] = Auth::user()->user_id;
         $data['booking_status'] = 'pending';
-        $response1 = DB::table('cars')->where('car_id', $data['car_id'])->update(['availability' => false]);
-        if (!$response1) {
+
+        // Lock car
+        $carUpdated = DB::table('cars')
+            ->where('car_id', $data['car_id'])
+            ->where('availability', true)
+            ->update(['availability' => false]);
+
+        if (!$carUpdated) {
             return "This car is not available. Please select another car.";
         }
-        else {
-            $response = DB::table('bookings')->insert($data);
-            if (!$response) {
-                return "Failed to create booking.";
-            } else {
-                return null;
-            }
-        }
+
+        // Assign delivery office
+        $data['delivery_office_id'] = $this->getResponsibleOffice(
+            $data['pickup_latitude'], $data['pickup_longitude'], 'can_deliver'
+        );
+        $data['deliver_need'] = !is_null($data['delivery_office_id']) ? 1 : 0;
+
+        // Assign takeback office
+        $data['takeback_office_id'] = $this->getResponsibleOffice(
+            $data['dropoff_latitude'], $data['dropoff_longitude'], 'can_takeback'
+        );
+        $data['take_back_need'] = !is_null($data['takeback_office_id']) ? 1 : 0;
+
+        $inserted = DB::table('bookings')->insert($data);
+        return $inserted ? null : "Failed to create booking.";
     }
 
-    public function updateBooking($data)
+    private function getResponsibleOffice($lat, $lng, $capability = 'can_deliver')
     {
-        (isset($data['car_id'])) ? $data['car_id'] : $data['car_id'] = null;
-        $response = DB::table('bookings')->where('booking_id', $data['booking_id'])->update($data);
-        if (!$response) {
-            return "Failed to update booking.";
-        } else {
-            if (isset($data['car_id'])) {
-                $response = DB::table('cars')->where('car_id', $data['car_id'])->update(['availability' => true]);
-                if (!$response) {
-                    return "Failed to update car availability.";
-                }
-            }
-            return null;
-        }
-    }
-
-    public function getCustomerPickupBookings()
-    {
-        $bookings = DB::table('bookings')
-            ->where('deliver_need', true)
-            ->where('booking_status', 'pending')
-            ->get();
-        if (!$bookings) {
-            return "No customer pickup bookings found.";
-        }
-        return $bookings;
+        return DB::table('office_service_areas as osa')
+            ->select('osa.office_location_id')
+            ->where($capability, 1)
+            ->whereRaw(
+                '(6371 * acos(
+                    cos(radians(?)) * cos(radians(osa.latitude)) *
+                    cos(radians(osa.longitude) - radians(?)) +
+                    sin(radians(?)) * sin(radians(osa.latitude))
+                )) <= osa.radius_km',
+                [$lat, $lng, $lat]
+            )
+            ->orderByRaw(
+                '(6371 * acos(
+                    cos(radians(?)) * cos(radians(osa.latitude)) *
+                    cos(radians(osa.longitude) - radians(?)) +
+                    sin(radians(?)) * sin(radians(osa.latitude))
+                ))',
+                [$lat, $lng, $lat]
+            )
+            ->value('office_location_id');
     }
 
     public function cancelBooking($id, $user_id)
@@ -197,45 +272,123 @@ class BookingService
             ->first();
 
         if (!$booking) {
-            return "Booking not found";
+            return "Booking not found.";
         }
 
-        $status = $booking->booking_status;
-
-        if ($status == 'pending' || $status == 'confirmed') {
-
-            $response = DB::table('bookings')
-                ->where('booking_id', $id)
-                ->where('user_id', $user_id) 
-                ->update(['booking_status' => 'cancelled']);
-
-            if (!$response) {
-                return "Failed to cancel booking.";
-            }
-
-            $car_id = $booking->car_id;
-            $car_update_response = DB::table('cars')
-                ->where('car_id', $car_id)
-                ->update(['availability' => true]);
-
-            if (!$car_update_response) {
-                return "Booking cancelled, but failed to update car availability.";
-            }
-            
-            if ($status == 'confirmed') { 
-                $user_update_response = DB::table('users')
-                    ->where('user_id', $booking->user_id)
-                    ->increment('cancellation_count');
-
-                if (!$user_update_response) {
-                    return "Booking cancelled, but failed to update user's cancellation count.";
-                }
-            }
-            
-            return null;
-        } 
-        else {
+        if (!in_array($booking->booking_status, ['pending', 'confirmed'])) {
             return "Only pending or confirmed bookings can be cancelled.";
         }
+
+        $updated = DB::table('bookings')
+            ->where('booking_id', $id)
+            ->update(['booking_status' => 'cancelled']);
+
+        if (!$updated) {
+            return "Failed to cancel booking.";
+        }
+
+        // Free car
+        DB::table('cars')
+            ->where('car_id', $booking->car_id)
+            ->update(['availability' => true]);
+
+        // Increment cancellation count if confirmed
+        if ($booking->booking_status === 'confirmed') {
+            DB::table('users')
+                ->where('user_id', $booking->user_id)
+                ->increment('cancellation_count');
+        }
+
+        return null;
+    }
+
+    public function getCustomerPickupBookings($office_id)
+    {
+
+        // 1. Get office timezone
+        $timezoneResult = $this->commonService->getOfficeTimezone($office_id);
+
+        if (str_starts_with($timezoneResult, 'Error:')) {
+            return ['error' => $timezoneResult];
+        }
+
+        $officeTimezone = $timezoneResult;
+        $now = \Carbon\Carbon::now($officeTimezone);
+        $today = $now->format('Y-m-d');
+
+        // 2. Get office lat/lng
+        $office = DB::table('office_locations')
+            ->where('office_location_id', $office_id)
+            ->select('latitude', 'longitude')
+            ->first();
+
+        if (!$office) {
+            return ['error' => "Error: Office not found (ID: {$office_id})"];
+        }
+
+        // 3. Query: today + pending + delivery
+        $bookings = DB::table('bookings as b')
+            ->join('cars as c', 'b.car_id', '=', 'c.car_id')
+            ->where('b.deliver_need', 1)
+            ->where('b.booking_status', 'pending')
+            ->whereDate('b.pickup_datetime', $today)
+            ->where('b.delivery_office_id', $office_id)
+            ->select(
+                'b.booking_id',
+                'b.ticket_number',
+                'b.pickup_datetime',
+                'b.pickup_latitude',
+                'b.pickup_longitude',
+                'c.model',
+                'c.license_plate'
+            )
+            ->get();
+
+        if ($bookings->isEmpty()) {
+            return [];
+        }
+
+        $result = collect();
+
+        foreach ($bookings as $b) {
+            $pickupLocal = \Carbon\Carbon::parse($b->pickup_datetime, 'UTC')->setTimezone($officeTimezone);
+
+            $distance = $this->commonService->haversine(
+                $office->latitude,
+                $office->longitude,
+                (float)$b->pickup_latitude,
+                (float)$b->pickup_longitude
+            );
+
+            $minutesUntil = $now->diffInMinutes($pickupLocal, false);
+            $isOverdue = $minutesUntil < 0;
+
+            $priority = $isOverdue
+                ? -1000 + abs($minutesUntil)
+                : $distance + max(0, $minutesUntil / 60);
+
+            $result->push([
+                'booking_id'       => $b->booking_id,
+                'ticket_number'    => $b->ticket_number,
+                'pickup_datetime'  => $pickupLocal->format('Y-m-d H:i:s'),
+                'pickup_latitude'  => (float)$b->pickup_latitude,
+                'pickup_longitude' => (float)$b->pickup_longitude,
+                'model'            => $b->model,
+                'license_plate'    => $b->license_plate,
+                'distance_km'      => round($distance, 2),
+                'minutes_until'    => (int)$minutesUntil,
+                'is_overdue'       => $isOverdue
+            ]);
+        }
+
+        return $result
+            ->sortBy(function ($item) use ($distance, $minutesUntil) {
+                $isOverdue = $item['minutes_until'] < 0;
+                return $isOverdue
+                    ? -1000 + abs($item['minutes_until'])
+                    : $item['distance_km'] + max(0, $item['minutes_until'] / 60);
+            })
+            ->values()
+            ->toArray();
     }
 }
