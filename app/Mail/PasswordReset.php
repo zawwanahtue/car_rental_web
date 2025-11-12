@@ -16,7 +16,7 @@ class PasswordReset extends Mailable
     public function build()
     {
         return $this->from(config('mail.from.address'))
-            ->subject('Your account has been created successfully!')
+            ->subject('Your account password has been reset successfully!')
             ->view('emails.password_reset')
             ->with([
                 'user_name' => $this->user_name,
