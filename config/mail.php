@@ -42,7 +42,7 @@ return [
             'scheme' => env('MAIL_SCHEME'),
             'url' => env('MAIL_URL'),
             'host' => env('MAIL_HOST', 'smtp.mailgun.org'),
-            'port' => 587,
+            'port' => 25,
             'encryption' => 'tls',
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
