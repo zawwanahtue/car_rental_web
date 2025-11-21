@@ -311,10 +311,7 @@ class BookingService
     public function getCustomerPickupBookings($officeId)
     {
         // 1. Get office timezone
-        $officeTimezone = $this->commonService->getOfficeTimezone($officeId);
-        if (str_starts_with($officeTimezone, 'Error:')) {
-            return ['error' => $officeTimezone];
-        }
+        $officeTimezone = 'Asia/Yangon';
 
         // 2. Use UTC for DB query
         $nowUtc = Carbon::now('UTC');
@@ -400,10 +397,7 @@ class BookingService
     // ===================================================================
     public function getCustomerTakebackBookings($officeId)
     {
-        $officeTimezone = $this->commonService->getOfficeTimezone($officeId);
-        if (str_starts_with($officeTimezone, 'Error:')) {
-            return ['error' => $officeTimezone];
-        }
+        $officeTimezone = 'Asia/Yangon';
 
         $nowUtc = Carbon::now('UTC');
         $todayUtc = $nowUtc->format('Y-m-d');
