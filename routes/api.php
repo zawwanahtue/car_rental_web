@@ -11,6 +11,7 @@ use App\Http\Controllers\OwnerController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\TestingController;
 use App\Services\ReviewService;
+use App\Http\Controllers\UserPreferenceLocationController;
 
 Route::get('/proxy-image', [ImageController::class, 'proxyImage']);
 Route::post('/register', [UserController::class, 'register']);
@@ -32,6 +33,10 @@ Route::middleware('auth:sanctum')->group(function ()
         // Review routes
         Route::post('/review-create', [ReviewController::class, 'submitReview']);
         Route::get('/my-bookings', [BookingController::class, 'getBookingByUser']);
+
+        // User Preference Location routes
+        Route::post('/preference-location', [UserPreferenceLocationController::class, 'store']);
+        Route::get('/preference-locations', [UserPreferenceLocationController::class, 'index']);
     });
 
     // Staff routes
@@ -74,7 +79,9 @@ Route::middleware('auth:sanctum')->group(function ()
         Route::delete('/owner-delete/{id}', [OwnerController::class, 'deleteOwner']);
 
         // Contact Us routes
-        Route::get('/contact-us', [ContactUsController::class, 'getContactUs']);
+        Route::get('/contact-us', [ContactUsController::class, 'getContactUsAdmin']);
+        Route::get('/resolve-contact-us/{contactId}', [ContactUsController::class, 'resolveContactUs']);
+        Route::post('/assign-contact-us', [ContactUsController::class, 'assignContactUs']);
 
         // Review routes
         Route::get('/reviews', [ReviewController::class, 'getAdminReviews']);

@@ -101,6 +101,8 @@ class UserService
                 'u.name',
                 'u.phone',
                 'u.email',
+                'u.no_show_count',
+                'u.cancellation_count',
                 'u.is_banned',
                 'u.created_at',
                 'u.updated_at',
@@ -256,46 +258,61 @@ class UserService
                 'u.name',
                 'u.phone',
                 'u.email',
+                'u.no_show_count',
+                'u.cancellation_count',
                 'u.is_banned',
                 'u.created_at',
                 'u.updated_at',
                 DB::raw("CONCAT('" . env('R2_URL') . "/', pp.photo_path) as profile_image_url")
             );
 
+        // Search
         if (!empty($data['search_by'])) {
-            $searchTerm = '%' . $data['search_by'] . '%'; 
+            $searchTerm = '%' . $data['search_by'] . '%';
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('u.name', 'LIKE', $searchTerm)
                 ->orWhere('u.email', 'LIKE', $searchTerm)
-                ->orWhere('u.phone', 'LIKE', $searchTerm); 
+                ->orWhere('u.phone', 'LIKE', $searchTerm);
             });
         }
 
+        // Filter by role or ban status
         if (!empty($data['filter_by'])) {
-            if ($data['filter_by'] == 'user') {
-                $query->where('ut.type_name', 'user');
-            } else if ($data['filter_by'] == 'admin') {
-                $query->where('ut.type_name', 'admin');
-            } else if ($data['filter_by'] == 'staff') {
-                $query->where('ut.type_name', 'staff');
-            } else if ($data['filter_by'] == 'banned_user') {
-                $query->where('u.is_banned', true);
-            } else if ($data['filter_by'] == 'active_user') {
-                $query->where('u.is_banned', false);
+            switch ($data['filter_by']) {
+                case 'user':
+                    $query->where('ut.type_name', 'user');
+                    break;
+                case 'admin':
+                    $query->where('ut.type_name', 'admin');
+                    break;
+                case 'staff':
+                    $query->where('ut.type_name', 'staff');
+                    break;
+                case 'banned_user':
+                    $query->where('u.is_banned', true);
+                    break;
+                case 'active_user':
+                    $query->where('u.is_banned', false);
+                    break;
             }
         }
 
-        $totalUsers = DB::table('users')->count();
+        // Total count (before pagination)
+        $totalUsers = (clone $query)->count();
 
-        $page = max(1, (int)$data['first']);
-        $max = max(1, (int)$data['max']);
-        $offset = ($page - 1) * $max;
+        // Pagination — safe defaults if null
+        $page = max(1, (int)($data['first'] ?? 1));
+        $perPage = min(100, max(1, (int)($data['max'] ?? 20))); // default 20
+        $offset = ($page - 1) * $perPage;
 
-        $users = $query->offset($offset)->limit($max)->get();
+        $users = $query->offset($offset)->limit($perPage)->get();
 
         return [
-            'users' => $users,
-            'total_users' => $totalUsers
+            'users'        => $users,
+            'total_users'  => $totalUsers,
+            'current_page' => $page,
+            'per_page'     => $perPage,
+            'total_pages'  => ceil($totalUsers / $perPage)
         ];
     }
 
@@ -336,6 +353,8 @@ class UserService
                 'u.name',
                 'u.phone',
                 'u.email',
+                'u.no_show_count',
+                'u.cancellation_count',
                 'u.is_banned',
                 'u.created_at',
                 'u.updated_at',

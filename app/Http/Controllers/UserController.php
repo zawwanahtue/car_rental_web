@@ -183,21 +183,22 @@ class UserController extends Controller
 
     public function userList(Request $request) 
     {
-        $rule = [
-            'search_by' => 'nullable|string|max:255',
-            'first' => 'required|integer|min:1',
-            'max' => 'required|integer|min:1',
-            'filter_by' => 'nullable|string|in:user,banned_user,active_user,admin,staff',
+        $rules = [
+            'search_by'  => 'nullable|string|max:255',
+            'first'      => 'nullable|integer|min:1',
+            'max'        => 'nullable|integer|min:1|max:100',
+            'filter_by'  => 'nullable|string|in:user,banned_user,active_user,admin,staff',
         ];
 
-        $validate = $this->helper->validate($request, $rule); 
-        if (is_null($validate)) {
-            $data = $request->all();
-            $response = $this->userService->userList($data);
-            return $this->helper->PostMan($response, 200, "Users Retrieved Successfully");
-        } else {
+        $validate = $this->helper->validate($request, $rules);
+        if (!is_null($validate)) {
             return $this->helper->PostMan(null, 422, $validate);
         }
+
+        $data = $request->all();
+        $response = $this->userService->userList($data);
+
+        return $this->helper->PostMan($response, 200, "Users Retrieved Successfully");
     }
 
     public function banAndUnbanUser($id)

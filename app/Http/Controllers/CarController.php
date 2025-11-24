@@ -85,21 +85,26 @@ class CarController extends Controller
     public function getCars(Request $request)
     {
         $rules = [
-            'first' => 'required|integer|min:1',
-            'max' => 'required|integer|min:1',
+            'first'           => 'required|integer|min:1',
+            'max'             => 'required|integer|min:1|max:100',
+            'search_by'       => 'nullable|string|max:255',
             'pickup_datetime' => 'nullable|date|required_with:dropoff_datetime',
-            'dropoff_datetime' => 'nullable|date|required_with:pickup_datetime',
-            'asc_total' => 'nullable|in:true,false',
-            'asc_hour' => 'nullable|in:true,false',
-            'asc_day' => 'nullable|in:true,false',
-            'car_type_id' => 'nullable|integer|exists:car_type,car_type_id',
-            'fuel_type' => 'nullable|in:petrol,diesel,electric',
+            'dropoff_datetime'=> 'nullable|date|required_with:pickup_datetime',
+            'asc_total'       => 'nullable|in:true,false',
+            'asc_hour'        => 'nullable|in:true,false',
+            'asc_day'         => 'nullable|in:true,false',
+            'car_type_id'     => 'nullable|integer|exists:car_type,car_type_id',
+            'fuel_type'       => 'nullable|in:petrol,diesel,electric',
+            'availability'    => 'nullable|in:true,false',
         ];
 
         $validator = Validator::make($request->all(), $rules);
 
         $validator->after(function ($validator) use ($request) {
-            $ascCount = collect(['asc_total', 'asc_hour', 'asc_day'])->filter(fn($f) => $request->filled($f))->count();
+            $ascCount = collect(['asc_total', 'asc_hour', 'asc_day'])
+                ->filter(fn($f) => $request->filled($f))
+                ->count();
+
             if ($ascCount > 1) {
                 $validator->errors()->add('sort', 'Only one sorting option allowed.');
             }
@@ -120,6 +125,9 @@ class CarController extends Controller
 
         $data = $request->all();
         $data['total_hours'] = $totalHours;
+        $data['availability'] = $request->has('availability')
+            ? filter_var($request->availability, FILTER_VALIDATE_BOOLEAN)
+            : true; // default = only available
 
         $response = $this->carService->getCars($data);
 
@@ -163,7 +171,7 @@ class CarController extends Controller
                 'required',
                 'string',
                 'max:20',
-                Rule::unique('cars', 'license_plate')->ignore($id),
+                Rule::unique('cars', 'license_plate')->ignore($id, 'car_id'),
             ],
             'car_type_id' => 'nullable|integer|exists:car_type,car_type_id',
             'price_per_hour' => 'nullable|numeric|min:0',
@@ -181,7 +189,7 @@ class CarController extends Controller
         $validate = $this->helper->validate($request, $rules);
         if (is_null($validate)) {
             $data = $request->all();
-            $data['id'] = $id;
+            $data['car_id'] = $id;
             $response = $this->carService->updateCar($data);
             return is_null($response)
                 ? $this->helper->PostMan(null, 200, "Car Updated Successfully")

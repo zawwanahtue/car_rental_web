@@ -114,23 +114,36 @@ class CarService
             return "Car type not found.";
         }
 
-        if ($carType->photo_path_id) {
-            $photoPath = $this->alreadyExistsImagePath($carType->photo_path_id);
-            if ($photoPath) {
-                $this->fileService->deleteFile($photoPath);
+        // Wrap in transaction for safety
+        DB::transaction(function () use ($carType) {
+            // 1. Delete the car_type FIRST → removes FK reference
+            DB::table('car_type')->where('car_type_id', $carType->car_type_id)->delete();
+
+            // 2. Now safe to delete the photo
+            if ($carType->photo_path_id) {
+                $photoPath = $this->alreadyExistsImagePath($carType->photo_path_id);
+                if ($photoPath) {
+                    $this->fileService->deleteFile($photoPath);
+                }
+
+                // Now no foreign key blocking this
+                DB::table('photo_paths')
+                    ->where('photo_path_id', $carType->photo_path_id)
+                    ->delete();
             }
-            DB::table('photo_paths')->where('photo_path_id', $carType->photo_path_id)->delete();
-        }
+        });
 
-        DB::table('car_type')->where('car_type_id', $id)->delete();
-
-        return null;
+        return null; // success
     }
 
     // ==================== CARS ====================
 
     public function getCars($data)
     {
+        $perPage = max(1, min(100, (int)($data['max'] ?? 10)));
+        $page    = max(1, (int)($data['first'] ?? 1));
+        $offset  = ($page - 1) * $perPage;
+
         $query = DB::table('cars as c')
             ->leftJoin('car_type as ct', 'c.car_type_id', '=', 'ct.car_type_id')
             ->leftJoin('photo_paths as pp', 'c.photo_path_id', '=', 'pp.photo_path_id')
@@ -151,8 +164,10 @@ class CarService
                 'c.created_at',
                 'c.updated_at',
                 DB::raw("CONCAT('" . env('R2_URL') . "/', pp.photo_path) as car_image_url")
-            )
-            ->where('c.availability', true);
+            );
+
+        // === FILTERS ===
+        $query->where('c.availability', $data['availability'] ?? true);
 
         if (!empty($data['car_type_id'])) {
             $query->where('c.car_type_id', $data['car_type_id']);
@@ -160,15 +175,29 @@ class CarService
         if (!empty($data['fuel_type'])) {
             $query->where('c.fuel_type', $data['fuel_type']);
         }
+        if (!empty($data['search_by'])) {
+            $search = '%' . trim($data['search_by']) . '%';
+            $query->where(function ($q) use ($search) {
+                $q->where('c.model', 'like', $search)
+                ->orWhere('ct.type_name', 'like', $search)
+                ->orWhere('c.license_plate', 'like', $search);
+            });
+        }
 
-        $totalCars = DB::table('cars')->where('availability', true)->count();
+        // === TOTAL COUNT ===
+        $totalCars = (clone $query)->count();
 
-        $page = max(1, (int)($data['first'] ?? 1));
-        $max = max(1, (int)($data['max'] ?? 10));
-        $offset = ($page - 1) * $max;
+        // === SORTING IN DATABASE (FAST & CORRECT) ===
+        if (!empty($data['asc_hour'])) {
+            $query->orderBy('c.price_per_hour', $data['asc_hour'] === 'true' ? 'asc' : 'desc');
+        } elseif (!empty($data['asc_day'])) {
+            $query->orderBy('c.price_per_day', $data['asc_day'] === 'true' ? 'asc' : 'desc');
+        }
 
-        $cars = $query->offset($offset)->limit($max)->get();
+        // === PAGINATION ===
+        $cars = $query->offset($offset)->limit($perPage)->get();
 
+        // === TOTAL PRICE (only for current page) ===
         if (!empty($data['total_hours'])) {
             $hours = (float)$data['total_hours'];
             $cars = $cars->map(function ($car) use ($hours) {
@@ -176,27 +205,25 @@ class CarService
                     $car->total_price = round($hours * $car->price_per_hour, 2);
                 } else {
                     $days = floor($hours / 24);
-                    $remainingHours = $hours - ($days * 24);
-                    $car->total_price = round(($days * $car->price_per_day) + ($remainingHours * $car->price_per_hour), 2);
+                    $remaining = $hours - ($days * 24);
+                    $car->total_price = round(($days * $car->price_per_day) + ($remaining * $car->price_per_hour), 2);
                 }
                 return $car;
             });
-        }
 
-        if (!empty($data['asc_total'])) {
-            $asc = $data['asc_total'] === 'true';
-            $cars = $cars->sortBy('total_price', SORT_REGULAR, !$asc)->values();
-        } elseif (!empty($data['asc_hour'])) {
-            $asc = $data['asc_hour'] === 'true';
-            $cars = $cars->sortBy('price_per_hour', SORT_REGULAR, !$asc)->values();
-        } elseif (!empty($data['asc_day'])) {
-            $asc = $data['asc_day'] === 'true';
-            $cars = $cars->sortBy('price_per_day', SORT_REGULAR, !$asc)->values();
+            // === SORT BY TOTAL PRICE (after calculating) ===
+            if (!empty($data['asc_total'])) {
+                $asc = $data['asc_total'] === 'true';
+                $cars = $cars->sortBy('total_price', SORT_REGULAR, !$asc)->values();
+            }
         }
 
         return [
-            'cars' => $cars,
-            'totalCars' => $totalCars
+            'data'       => $cars,
+            'first'      => $page,
+            'max'        => $perPage,
+            'total'      => $totalCars,
+            'total_page' => $totalCars > 0 ? ceil($totalCars / $perPage) : 1
         ];
     }
 
@@ -236,7 +263,7 @@ class CarService
 
     public function updateCar($data)
     {
-        $car = DB::table('cars')->where('car_id', $data['id'])->first();
+        $car = DB::table('cars')->where('car_id', $data['car_id'])->first();
         if (!$car) {
             return "Car not found.";
         }
@@ -257,7 +284,7 @@ class CarService
                 ->update(['photo_path' => $newPath, 'updated_at' => now()]);
         }
 
-        DB::table('cars')->where('car_id', $data['id'])->update([
+        DB::table('cars')->where('car_id', $data['car_id'])->update([
             'car_type_id' => $data['car_type_id'] ?? $car->car_type_id,
             'model' => $data['car_model'] ?? $car->model,
             'license_plate' => $data['license_plate'] ?? $car->license_plate,
@@ -283,17 +310,25 @@ class CarService
             return "Car not found.";
         }
 
-        if ($car->photo_path_id) {
-            $photoPath = $this->alreadyExistsImagePath($car->photo_path_id);
-            if ($photoPath) {
-                $this->fileService->deleteFile($photoPath);
+        DB::transaction(function () use ($car) {
+            // 1. Delete the CAR first (removes FK reference)
+            DB::table('cars')->where('car_id', $car->car_id)->delete();
+
+            // 2. Now safe to delete the photo
+            if ($car->photo_path_id) {
+                $photoPath = $this->alreadyExistsImagePath($car->photo_path_id);
+                if ($photoPath) {
+                    $this->fileService->deleteFile($photoPath);
+                }
+
+                // Now safe — no car references this photo_path_id anymore
+                DB::table('photo_paths')
+                    ->where('photo_path_id', $car->photo_path_id)
+                    ->delete();
             }
-            DB::table('photo_paths')->where('photo_path_id', $car->photo_path_id)->delete();
-        }
+        });
 
-        DB::table('cars')->where('car_id', $id)->delete();
-
-        return null;
+        return null; // success
     }
 
     public function isCarAvailable($id)
