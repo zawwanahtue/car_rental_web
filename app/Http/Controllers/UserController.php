@@ -152,6 +152,34 @@ class UserController extends Controller
         }
     }
 
+    public function changePassword(Request $request)
+    {
+        $rules = [
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|min:8|confirmed',
+        ];
+
+        $validate = $this->helper->Validate($request, $rules);
+        if (is_null($validate))
+        {
+            $data = $request->all();
+            $response = $this->userService->changePassword($data);
+
+            if (is_null($response))
+            {
+                return $this->helper->PostMan(null, 200, "Password Changed Successfully");
+            }
+            else
+            {
+                return $this->helper->PostMan(null, 400, $response);
+            }
+        }
+        else
+        {
+            return $this->helper->PostMan(null, 422, $validate);
+        }
+    }
+
     public function profileImageRequest(Request $request)
     {
         $rules = [

@@ -147,6 +147,7 @@ class CarService
         $query = DB::table('cars as c')
             ->leftJoin('car_type as ct', 'c.car_type_id', '=', 'ct.car_type_id')
             ->leftJoin('photo_paths as pp', 'c.photo_path_id', '=', 'pp.photo_path_id')
+            ->leftJoin('office_locations as ol', 'c.office_location_id', '=', 'ol.office_location_id')
             ->select(
                 'c.car_id',
                 'ct.type_name as car_type',
@@ -161,14 +162,49 @@ class CarService
                 'c.color',
                 'c.transmission',
                 'c.fuel_type',
+                'c.office_location_id',
+                'ol.location_name as office_name',
                 'c.created_at',
                 'c.updated_at',
                 DB::raw("CONCAT('" . env('R2_URL') . "/', pp.photo_path) as car_image_url")
             );
 
-        // === FILTERS ===
+        // DEFAULT: only available cars
         $query->where('c.availability', $data['availability'] ?? true);
 
+        // NEW: Auto filter by NEAREST office if pickup location is sent
+        if (!empty($data['pickup_latitude']) && !empty($data['pickup_longitude'])) {
+            $lat = $data['pickup_latitude'];
+            $lng = $data['pickup_longitude'];
+
+            // Get only the nearest office
+            $nearestOffice = DB::table('office_locations')
+                ->select('office_location_id')
+                ->orderByRaw(
+                    '(6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude))))',
+                    [$lat, $lng, $lat]
+                )
+                ->first();
+
+            if ($nearestOffice) {
+                $query->where('c.office_location_id', $nearestOffice->office_location_id);
+            } else {
+                // No office found → return empty
+                return [
+                    'data'       => collect(),
+                    'first'      => $page,
+                    'max'        => $perPage,
+                    'total'      => 0,
+                    'total_page' => 1
+                ];
+            }
+        }
+        // If user manually picks office → respect that
+        elseif (!empty($data['office_location_id'])) {
+            $query->where('c.office_location_id', $data['office_location_id']);
+        }
+
+        // Your existing filters (unchanged)
         if (!empty($data['car_type_id'])) {
             $query->where('c.car_type_id', $data['car_type_id']);
         }
@@ -184,14 +220,11 @@ class CarService
             });
         }
 
-        // === TOTAL COUNT (before sorting) ===
         $totalCars = (clone $query)->count();
 
-        // === CALCULATE TOTAL PRICE IN SQL (for correct global sorting) ===
         $hours = !empty($data['total_hours']) ? (float)$data['total_hours'] : null;
 
         if ($hours !== null) {
-            // This is the MAGIC: calculate total_price in SQL → can sort globally
             $query->selectRaw(
                 "IF(? < 24,
                     ROUND(? * c.price_per_hour, 2),
@@ -205,22 +238,21 @@ class CarService
             );
         }
 
-        // === SORTING (GLOBAL & CORRECT) ===
+        // Sorting
         if (!empty($data['asc_hour'])) {
             $query->orderBy('c.price_per_hour', $data['asc_hour'] === 'true' ? 'asc' : 'desc');
         } elseif (!empty($data['asc_day'])) {
             $query->orderBy('c.price_per_day', $data['asc_day'] === 'true' ? 'asc' : 'desc');
         } elseif (!empty($data['asc_total']) && $hours !== null) {
             $query->orderBy('total_price', $data['asc_total'] === 'true' ? 'asc' : 'desc');
+        } else {
+            $query->orderBy('c.created_at', 'desc');
         }
 
-        // === PAGINATION (AFTER sorting) ===
         $cars = $query->offset($offset)->limit($perPage)->get();
 
-        // === FINAL: Add total_price to object (if not already from SQL) ===
         if ($hours !== null) {
-            $cars = $cars->map(function ($car) use ($hours) {
-                // total_price already calculated in SQL → just cast
+            $cars = $cars->map(function ($car) {
                 $car->total_price = (float)$car->total_price;
                 return $car;
             });

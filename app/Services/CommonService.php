@@ -23,10 +23,8 @@ class CommonService
     public function generateTicketNumber()
     {
         $date = now()->format('Ymd');
-        $countToday = DB::table('bookings')
-            ->whereDate('created_at', now())
-            ->count() + 1;
-        $ticketNumber = 'TCK-' . $date . '-' . str_pad($countToday, 4, '0', STR_PAD_LEFT);
+        $time = now()->format('His');
+        $ticketNumber = 'TCK-' . $date . '-' . $time;
         return $ticketNumber;
     }
 

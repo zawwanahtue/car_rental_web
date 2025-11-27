@@ -55,10 +55,22 @@ class BookingController extends Controller
         }
     }
 
-    public function getBookingByUser()
+    public function getBookingByUser(Request $request)
     {
-        $bookings = $this->bookingService->getBookingsByUser();
-        return $this->helper->PostMan($bookings, 200, "User Bookings Retrieved Successfully");
+        $rules = [
+            'first' => 'nullable|integer|min:1',
+            'max'   => 'nullable|integer|min:1|max:100',
+        ];
+
+        $validate = $this->helper->validate($request, $rules);
+        if (!is_null($validate)) {
+            return $this->helper->PostMan(null, 422, $validate);
+        }
+
+        $data = $request->all();
+        $response = $this->bookingService->getBookingsByUser($data);
+
+        return $this->helper->PostMan($response, 200, "User Bookings Retrieved Successfully");
     }
 
     public function createBooking(Request $request)
@@ -76,8 +88,6 @@ class BookingController extends Controller
             'dropoff_latitude' => 'required|numeric',
             'dropoff_longitude' => 'required|numeric',
             'total_amount' => 'required|numeric|min:0',
-            'cancellation_fine' => 'nullable|numeric|min:0',
-            'no_show_fine' => 'nullable|numeric|min:0'
         ];
 
         $validate = $this->helper->validate($request, $rules);
@@ -86,7 +96,7 @@ class BookingController extends Controller
                 'car_id', 'pickup_datetime', 'dropoff_datetime',
                 'pickup_latitude', 'pickup_longitude',
                 'dropoff_latitude', 'dropoff_longitude',
-                'total_amount', 'cancellation_fine', 'no_show_fine'
+                'total_amount'
             ]);
 
             $response = $this->bookingService->createBooking($data);
@@ -113,9 +123,7 @@ class BookingController extends Controller
 
     public function getTodayDeliveries(Request $request)
     {
-        $rules = [
-            'office_id' => 'required|integer|exists:office_locations,office_location_id'
-        ];
+        $rules = ['office_id' => 'required|integer|exists:office_locations,office_location_id'];
         $validate = $this->helper->validate($request, $rules);
 
         if (!is_null($validate)) {
@@ -128,16 +136,218 @@ class BookingController extends Controller
 
     public function getTodayTakeBacks(Request $request)
     {
-        $rules = [
-            'office_id' => 'required|integer|exists:office_locations,office_location_id'
-        ];
+        $rules = ['office_id' => 'required|integer|exists:office_locations,office_location_id'];
         $validate = $this->helper->validate($request, $rules);
 
         if (!is_null($validate)) {
-        return $this->helper->PostMan(null, 422, $validate);
+            return $this->helper->PostMan(null, 422, $validate);
         }
 
         $takebacks = $this->bookingService->getCustomerTakebackBookings($request->office_id);
         return $this->helper->PostMan($takebacks, 200, "Today's take-backs retrieved");
+    }
+
+    // ===================================================================
+    // NEW STAFF TASK ENDPOINTS — FULLY WORKING
+    // ===================================================================
+
+    public function claimDelivery($booking_id)
+    {
+        $result = $this->bookingService->claimDeliveryTask($booking_id, Auth::id());
+
+        return is_null($result)
+            ? $this->helper->PostMan(null, 200, "Delivery task claimed successfully")
+            : $this->helper->PostMan(null, 400, $result);
+    }
+
+    public function claimTakeback($booking_id)
+    {
+        $result = $this->bookingService->claimTakebackTask($booking_id, Auth::id());
+
+        return is_null($result)
+            ? $this->helper->PostMan(null, 200, "Take-back task claimed successfully")
+            : $this->helper->PostMan(null, 400, $result);
+    }
+
+    public function myActiveTasks()
+    {
+        $tasks = $this->bookingService->getMyActiveTasks(Auth::id());
+        return $this->helper->PostMan($tasks, 200, "Your active tasks retrieved");
+    }
+
+    public function staffTaskHistory()
+    {
+        $history = $this->bookingService->getStaffTaskHistory(Auth::id());
+        return $this->helper->PostMan($history, 200, "Task history retrieved");
+    }
+
+    public function getMaintenanceTasks()
+    {
+        $staffId = Auth::id();
+        $tasks = $this->bookingService->getMaintenanceTaskHistory($staffId);
+        return $this->helper->PostMan($tasks, 200, "Maintenance tasks retrieved");
+    }
+
+    // 4. COMPLETE DELIVERY — simple body
+    public function completeDelivery(Request $request, $task_id)
+    {
+        $request->validate([
+            'amount_paid' => 'required|numeric|min:0',
+            'fine_amount' => 'nullable|numeric|min:0'  // optional fine
+        ]);
+
+        $result = $this->bookingService->completeDelivery([
+            'task_id'     => $task_id,
+            'staff_id'    => Auth::id(),
+            'amount_paid' => $request->amount_paid,
+            'fine_amount' => $request->fine_amount ?? 0
+        ]);
+
+        return is_null($result)
+            ? $this->helper->PostMan(null, 200, "Delivery completed & payment recorded")
+            : $this->helper->PostMan(null, 400, $result);
+    }
+
+    // 5. COMPLETE TAKEBACK — NO BODY NEEDED
+    public function completeTakeback($task_id)
+    {
+        $result = $this->bookingService->completeTakeback($task_id, Auth::id());
+
+        return is_null($result)
+            ? $this->helper->PostMan(null, 200, "Take-back completed & car returned")
+            : $this->helper->PostMan(null, 400, $result);
+    }
+
+    // BookingController.php
+
+    public function reportDamage(Request $request)
+    {
+        $rules = [
+            'car_id'      => 'required|integer|exists:cars,car_id',
+            'description' => 'required|string|max:1000',
+            'cost'        => 'nullable|numeric|min:0'
+        ];
+
+        $validate = $this->helper->validate($request, $rules);
+        if (!is_null($validate)) {
+            return $this->helper->PostMan(null, 422, $validate);
+        }
+
+        $result = $this->bookingService->reportDamage($request, Auth::id());
+
+        return is_null($result)
+            ? $this->helper->PostMan(null, 200, "Damage reported & maintenance task created")
+            : $this->helper->PostMan(null, 400, $result);
+    }
+
+    public function completeMaintenance($maintenance_id)
+    {
+        $result = $this->bookingService->completeMaintenance($maintenance_id, Auth::id());
+
+        return is_null($result)
+            ? $this->helper->PostMan(null, 200, "Car fixed & back in service")
+            : $this->helper->PostMan(null, 400, $result);
+    }
+
+    public function adminRevenueDashboard()
+    {
+        $service = $this->bookingService->getAdminDashboardData();
+
+        return $this->helper->PostMan($service, 200, "Dashboard loaded");
+    }
+
+    public function doTheStaffEarly()
+    {
+        $isEarly = $this->bookingService->doTheStaffEarly(Auth::id());
+
+        if($isEarly === true)
+        {
+            return $this->helper->PostMan(true, 200, "You are early today");
+        }
+        else
+        {
+            return $this->helper->PostMan($isEarly, 200, "You have tasks today");
+        }
+    }
+
+    public function costByTicketNumber($ticketNumber)
+    {
+        $costs = $this->bookingService->costByTicket($ticketNumber);
+
+        if (is_null($costs)) {
+            return $this->helper->PostMan(null, 404, "No booking found for the provided ticket number");
+        }
+
+        return $this->helper->PostMan($costs, 200, "Costs calculated successfully");
+    }
+
+    public function getTodaySelfPickups()
+    {
+        $list = $this->bookingService->getTodaySelfPickups();
+        return $this->helper->PostMan($list, 200, "Today's self pickups (all offices)");
+    }
+
+    public function getTodaySelfDropoffs()
+    {
+        $list = $this->bookingService->getTodaySelfDropoffs();
+        return $this->helper->PostMan($list, 200, "Today's self dropoffs (all offices)");
+    }
+
+    public function completeSelfPickup(Request $request)
+    {
+        $request->validate([
+            'booking_id'   => 'required|integer|exists:bookings,booking_id',
+            'amount_paid'  => 'required|numeric|min:0',
+            'fine_amount'  => 'nullable|numeric|min:0'
+        ]); 
+
+        $result = $this->bookingService->completeSelfPickup(
+            $request->booking_id,
+            Auth::id(),
+            $request->amount_paid,
+            $request->fine_amount ?? 0
+        );
+
+        return is_null($result)
+            ? $this->helper->PostMan(null, 200, "Self pickup completed successfully")
+            : $this->helper->PostMan(null, 400, $result);
+    }
+
+    public function completeSelfDropoff(Request $request)
+    {
+        $request->validate([
+            'booking_id' => 'required|integer|exists:bookings,booking_id'
+        ]);
+
+        $result = $this->bookingService->completeSelfDropoff(
+            $request->booking_id,
+            Auth::id()
+        );
+
+        return is_null($result)
+            ? $this->helper->PostMan(null, 200, "Self dropoff completed successfully")
+            : $this->helper->PostMan(null, 400, $result);
+    }
+
+    public function noShowDelivery(Request $request)
+    {
+        $request->validate(['booking_id' => 'required|integer|exists:bookings,booking_id']);
+
+        $result = $this->bookingService->markNoShowDelivery($request->booking_id, Auth::id());
+
+        return is_null($result)
+            ? $this->helper->PostMan(null, 200, "Customer marked as no-show (delivery)")
+            : $this->helper->PostMan(null, 400, $result);
+    }
+
+    public function noShowSelfPickup(Request $request)
+    {
+        $request->validate(['booking_id' => 'required|integer|exists:bookings,booking_id']);
+
+        $result = $this->bookingService->markNoShowSelfPickup($request->booking_id, Auth::id());
+
+        return is_null($result)
+            ? $this->helper->PostMan(null, 200, "Customer marked as no-show (self-pickup)")
+            : $this->helper->PostMan(null, 400, $result);
     }
 }

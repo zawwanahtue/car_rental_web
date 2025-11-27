@@ -85,33 +85,29 @@ class CarController extends Controller
     public function getCars(Request $request)
     {
         $rules = [
-            'first'           => 'required|integer|min:1',
-            'max'             => 'required|integer|min:1|max:100',
-            'search_by'       => 'nullable|string|max:255',
-            'pickup_datetime' => 'nullable|date|required_with:dropoff_datetime',
-            'dropoff_datetime'=> 'nullable|date|required_with:pickup_datetime',
-            'asc_total'       => 'nullable|in:true,false',
-            'asc_hour'        => 'nullable|in:true,false',
-            'asc_day'         => 'nullable|in:true,false',
-            'car_type_id'     => 'nullable|integer|exists:car_type,car_type_id',
-            'fuel_type'       => 'nullable|in:petrol,diesel,electric',
-            'availability'    => 'nullable|in:true,false',
+            'first'               => 'required|integer|min:1',
+            'max'                 => 'required|integer|min:1|max:100',
+            'search_by'           => 'nullable|string|max:255',
+            'pickup_datetime'     => 'nullable|date|required_with:dropoff_datetime',
+            'dropoff_datetime'    => 'nullable|date|required_with:pickup_datetime',
+            'pickup_latitude'     => 'nullable|numeric|between:-90,90',     // ADD THESE
+            'pickup_longitude'    => 'nullable|numeric|between:-180,180',  // ADD THESE
+            'asc_total'           => 'nullable|in:true,false',
+            'asc_hour'            => 'nullable|in:true,false',
+            'asc_day'             => 'nullable|in:true,false',
+            'car_type_id'         => 'nullable|integer|exists:car_type,car_type_id',
+            'office_location_id'  => 'nullable|integer|exists:office_locations,office_location_id',
+            'fuel_type'           => 'nullable|in:petrol,diesel,electric',
+            'availability'        => 'nullable|in:true,false',
         ];
+
+        // Add required_with for lat/lng when datetime is present
+        $rules['pickup_latitude']  = 'required_with:pickup_datetime|numeric|between:-90,90';
+        $rules['pickup_longitude'] = 'required_with:pickup_datetime|numeric|between:-180,180';
 
         $validator = Validator::make($request->all(), $rules);
 
-        $validator->after(function ($validator) use ($request) {
-            $ascCount = collect(['asc_total', 'asc_hour', 'asc_day'])
-                ->filter(fn($f) => $request->filled($f))
-                ->count();
-
-            if ($ascCount > 1) {
-                $validator->errors()->add('sort', 'Only one sorting option allowed.');
-            }
-            if ($request->filled('asc_total') && !$request->filled('pickup_datetime')) {
-                $validator->errors()->add('date', 'pickup_datetime and dropoff_datetime required for total price sorting.');
-            }
-        });
+        // ... your existing validator->after() logic ...
 
         if ($validator->fails()) {
             return $this->helper->PostMan(null, 422, $validator->errors()->first());
@@ -127,7 +123,11 @@ class CarController extends Controller
         $data['total_hours'] = $totalHours;
         $data['availability'] = $request->has('availability')
             ? filter_var($request->availability, FILTER_VALIDATE_BOOLEAN)
-            : true; // default = only available
+            : true;
+
+        // PASS LAT/LNG TO SERVICE
+        $data['pickup_latitude']  = $request->pickup_latitude;
+        $data['pickup_longitude'] = $request->pickup_longitude;
 
         $response = $this->carService->getCars($data);
 

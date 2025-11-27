@@ -36,7 +36,7 @@ class UserService
         // event(new Registered($user));
         if ($response)
         {
-            Mail::to($data['email'])->send(new Welcome($response));
+            // Mail::to($data['email'])->send(new Welcome($response));
             return null;
         }
         else
@@ -244,6 +244,25 @@ class UserService
 
         $userInfo = $this->currentUser($userId);
         return $userInfo;
+    }
+
+    public function changePassword($data)
+    {
+        $userId = Auth::user()->user_id;
+        $user = User::where('user_id', $userId)->first();
+
+        if (!$user) {
+            return 'User not found.';
+        }
+
+        if (!Hash::check($data['current_password'], $user->password)) {
+            return 'Current password is incorrect.';
+        }
+
+        $user->password = Hash::make($data['new_password']);
+        $user->save();
+
+        return null;
     }
 
     public function userList($data)

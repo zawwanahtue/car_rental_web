@@ -10,7 +10,7 @@ use App\Http\Controllers\OfficeLocationController;
 use App\Http\Controllers\OwnerController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\TestingController;
-use App\Services\ReviewService;
+use App\Services\BookingService;
 use App\Http\Controllers\UserPreferenceLocationController;
 
 Route::get('/proxy-image', [ImageController::class, 'proxyImage']);
@@ -44,10 +44,47 @@ Route::middleware('auth:sanctum')->group(function ()
         // Booking routes
         Route::get('/today-deliveries', [BookingController::class, 'getTodayDeliveries']);
         Route::get('/today-takebacks', [BookingController::class, 'getTodayTakeBacks']);
+
+        Route::get('/today-self-pickups', [BookingController::class, 'getTodaySelfPickups']);
+        Route::get('/today-self-dropoffs', [BookingController::class, 'getTodaySelfDropoffs']);
+
+        // Complete Self Pickup/Dropoff
+        Route::post('/complete-self-pickup', [BookingController::class, 'completeSelfPickup']);
+        Route::post('/complete-self-dropoff', [BookingController::class, 'completeSelfDropoff']);
+
+        // No-show Booking routes
+        Route::post('/no-show-delivery', [BookingController::class, 'noShowDelivery']);
+        Route::post('/no-show-pickup', [BookingController::class, 'noShowSelfPickup']);
+
+        // Task routes
+        Route::get('/claim-delivery/{booking_id}', [BookingController::class, 'claimDelivery']);
+        Route::get('/claim-takeback/{booking_id}', [BookingController::class, 'claimTakeback']);
+        Route::get('/my-active-tasks', [BookingController::class, 'myActiveTasks']);
+        Route::get('/complete-takeback/{booking_id}', [BookingController::class, 'completeTakeback']);
+        Route::post('/complete-delivery/{task_id}', [BookingController::class, 'completeDelivery']);
+        Route::get('/task-history', [BookingController::class, 'staffTaskHistory']);
+
+        // Maintenance routes
+        Route::get('/maintenance-tasks', [BookingController::class, 'getMaintenanceTasks']);
+        Route::get('/complete-maintenance/{maintenance_id}', [BookingController::class, 'completeMaintenance']);
+        Route::post('/report-damage', [BookingController::class, 'reportDamage']);
+
+        // Is Staff have task
+        Route::get('/is-have-task', [BookingController::class, 'doTheStaffEarly']);
+
+        // Cost By Ticket Number
+        Route::get('/cost-by-ticket/{ticket_number}', [BookingController::class, 'costByTicketNumber']);
+
+        // Contact Us routes
+        Route::get('/contact-us', [ContactUsController::class, 'getContactUsStaff']);
+        Route::get('/resolve-contact-us/{contactId}', [ContactUsController::class, 'resolveContactUs']);
     });
     
     // Admin routes
     Route::middleware('user_type:3')->prefix('/admin')->group(function (){
+        // Dashboard routes
+        Route::get('/revenue-dashboard', [BookingController::class, 'adminRevenueDashboard']);
+
         // User routes
         Route::get('/user-list', [UserController::class, 'userList']);
         Route::get('/ban-user/{id}', [UserController::class, 'banAndUnbanUser']);
@@ -93,6 +130,7 @@ Route::middleware('auth:sanctum')->group(function ()
     Route::post('/upload&update-profile-image', [UserController::class, 'profileImageRequest']);
     Route::delete('/delete-profile-image', [UserController::class, 'deleteProfileImage']);
     Route::put('/update-profile', [UserController::class, 'updateUser']);
+    Route::post('/change-password', [UserController::class, 'changePassword']);
     Route::get('/is-have-fines', [UserController::class, 'isHaveFines']);
 
     // Car routes 
@@ -108,6 +146,6 @@ Route::middleware('auth:sanctum')->group(function ()
 });
 
 Route::get('/mail', [TestingController::class, 'mail']);
-
+Route::get('/test', [BookingService::class, 'getResponsibleOffice']);
 
 //// testing route

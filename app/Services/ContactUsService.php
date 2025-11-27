@@ -133,4 +133,53 @@ class ContactUsService
             'total_page' => $total > 0 ? ceil($total / $perPage) : 1
         ];
     }
+
+    public function getContactUsStaff($staffId, $filters)
+    {
+        $perPage = $filters['max'];
+        $page    = $filters['first'];
+        $offset  = ($page - 1) * $perPage;
+
+        $query = DB::table('contact_us as c')
+            ->join('tasks as t', function ($join) use ($staffId) {
+                $join->on('t.contact_us_id', '=', 'c.contact_us_id')
+                    ->where('t.task_type', 'support_ticket')
+                    ->where('t.assigned_staff_id', $staffId);
+            })
+            ->select(
+                'c.contact_us_id',
+                'c.title',
+                'c.email',
+                'c.phone',
+                'c.description',
+                'c.is_resolved',
+                'c.created_at',
+
+                't.task_id',
+                't.status as task_status',
+                't.created_at as task_assigned_at'
+            );
+
+        // Filters
+        if ($filters['resolve'] !== null) {
+            $query->where('c.is_resolved', $filters['resolve']);
+        }
+
+        // Sorting
+        $query->orderBy('c.created_at', $filters['sort_by_time_asc'] ? 'asc' : 'desc');
+
+        // Total count
+        $total = (clone $query)->count();
+
+        // Paginated items
+        $items = $query->offset($offset)->limit($perPage)->get();
+
+        return [
+            'data'       => $items,
+            'first'      => $page,
+            'max'        => $perPage,
+            'total'      => $total,
+            'total_page' => $total > 0 ? ceil($total / $perPage) : 1
+        ];
+    }
 }

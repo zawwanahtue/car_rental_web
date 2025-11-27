@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Helpers\Helper;
 use App\Services\ContactUsService;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 
 class ContactUsController extends Controller
@@ -89,6 +90,23 @@ class ContactUsController extends Controller
         ];
 
         $result = $this->contactUsService->getContactUsAdmin($data);
+
+        // Only wrap once — remove extra "data" key
+        return $this->helper->PostMan($result, 200, "data retrieved successfully");
+    }
+
+    public function getContactUsStaff(Request $request)
+    {
+        $staffId = Auth::id();
+
+        $data = [
+            'first'            => max(1, (int)($request->first ?? 1)),
+            'max'              => min(100, max(1, (int)($request->max ?? 20))),
+            'sort_by_time_asc' => filter_var($request->sort_by_time_asc ?? 'false', FILTER_VALIDATE_BOOLEAN),
+            'resolve'          => $request->has('resolve') ? filter_var($request->resolve, FILTER_VALIDATE_BOOLEAN) : null,
+        ];
+
+        $result = $this->contactUsService->getContactUsStaff($staffId, $data);
 
         // Only wrap once — remove extra "data" key
         return $this->helper->PostMan($result, 200, "data retrieved successfully");
