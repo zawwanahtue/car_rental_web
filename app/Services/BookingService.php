@@ -295,10 +295,10 @@ class BookingService
             ->join('cars as c', 'b.car_id', '=', 'c.car_id')
             ->where('b.deliver_need', 1)
             ->whereIn('b.booking_status', ['pending', 'confirmed'])
-            ->where(function ($q) use ($todayStart, $now) {
-                $q->where('b.pickup_datetime', '<=', $now)                    // overdue (past)
-                ->orWhereBetween('b.pickup_datetime', [$todayStart, $todayStart->copy()->endOfDay()]); // today
-            })
+            // ->where(function ($q) use ($todayStart, $now) {
+            //     $q->where('b.pickup_datetime', '<=', $now)                    // overdue (past)
+            //     ->orWhereBetween('b.pickup_datetime', [$todayStart, $todayStart->copy()->endOfDay()]); // today
+            // })
             ->where('b.delivery_office_id', $officeId)
             ->whereNotExists(function ($query) {
                 $query->select(DB::raw(1))
@@ -351,10 +351,10 @@ class BookingService
             ->join('cars as c', 'b.car_id', '=', 'c.car_id')
             ->where('b.take_back_need', 1)
             ->where('b.booking_status', 'on_rent')
-            ->where(function ($q) use ($todayStart, $now) {
-                $q->where('b.dropoff_datetime', '<=', $now)
-                ->orWhereBetween('b.dropoff_datetime', [$todayStart, $todayStart->copy()->endOfDay()]);
-            })
+            // ->where(function ($q) use ($todayStart, $now) {
+            //     $q->where('b.dropoff_datetime', '<=', $now)
+            //     ->orWhereBetween('b.dropoff_datetime', [$todayStart, $todayStart->copy()->endOfDay()]);
+            // })
             ->where('b.takeback_office_id', $officeId)
             ->whereNotExists(function ($query) {
                 $query->select(DB::raw(1))
@@ -433,7 +433,7 @@ class BookingService
         $booking = DB::table('bookings')
             ->where('booking_id', $bookingId)
             ->where('take_back_need', 1)
-            ->whereIn('booking_status', ['pending', 'confirmed'])
+            ->whereIn('booking_status', ['on_rent'])
             ->first();
 
         if (!$booking) return "Take-back not available.";
@@ -627,14 +627,14 @@ class BookingService
             ]);
 
             // Create maintenance task
-            DB::table('tasks')->insert([
-                'task_type'        => 'maintenance',
-                'description'      => "Fix car #{$carId} - {$description}",
-                'status'           => 'pending',
-                'assigned_staff_id'=> $staffId,
-                'created_at'       => now(),
-                'updated_at'       => now(),
-            ]);
+            // DB::table('tasks')->insert([
+            //     'task_type'        => 'maintenance',
+            //     'description'      => "Fix car #{$carId} - {$description}",
+            //     'status'           => 'pending',
+            //     'assigned_staff_id'=> $staffId,
+            //     'created_at'       => now(),
+            //     'updated_at'       => now(),
+            // ]);
 
             // Car unavailable
             DB::table('cars')
@@ -645,7 +645,7 @@ class BookingService
             return null;
         } catch (\Exception $e) {
             DB::rollBack();
-            return "Failed to report damage.";
+            return "Failed to report damage. error: " . $e->getMessage();
         }
     }
 
@@ -668,14 +668,14 @@ class BookingService
                 ]);
 
             // Complete related task
-            DB::table('tasks')
-                ->where('task_type', 'maintenance')
-                ->where('description', 'LIKE', "%car #{$maintenance->car_id}%")
-                ->update([
-                    'status'            => 'completed',
-                    'assigned_staff_id' => $staffId,
-                    'updated_at'        => now(),
-                ]);
+            // DB::table('tasks')
+            //     ->where('task_type', 'maintenance')
+            //     ->where('description', 'LIKE', "%car #{$maintenance->car_id}%")
+            //     ->update([
+            //         'status'            => 'completed',
+            //         'assigned_staff_id' => $staffId,
+            //         'updated_at'        => now(),
+            //     ]);
 
             DB::table('cars')
                 ->where('car_id', $maintenance->car_id)
@@ -894,10 +894,10 @@ class BookingService
             ->join('cars as c', 'b.car_id', '=', 'c.car_id')
             ->where('b.deliver_need', 0)                                      // self pickup only
             ->whereIn('b.booking_status', ['pending', 'confirmed'])
-            ->where(function ($q) use ($todayStart, $now) {
-                $q->where('b.pickup_datetime', '<=', $now)                 // overdue
-                ->orWhereBetween('b.pickup_datetime', [$todayStart, $todayStart->copy()->endOfDay()]);
-            })
+            // ->where(function ($q) use ($todayStart, $now) {
+            //     $q->where('b.pickup_datetime', '<=', $now)                 // overdue
+            //     ->orWhereBetween('b.pickup_datetime', [$todayStart, $todayStart->copy()->endOfDay()]);
+            // })
             ->whereNull('b.delivery_office_id')                               // key: no delivery office
             ->select(
                 'b.booking_id',
@@ -945,10 +945,10 @@ class BookingService
             ->join('cars as c', 'b.car_id', '=', 'c.car_id')
             ->where('b.take_back_need', 0)                                    // self dropoff only
             ->where('b.booking_status', 'on_rent')
-            ->where(function ($q) use ($todayStart, $now) {
-                $q->where('b.dropoff_datetime', '<=', $now)
-                ->orWhereBetween('b.dropoff_datetime', [$todayStart, $todayStart->copy()->endOfDay()]);
-            })
+            // ->where(function ($q) use ($todayStart, $now) {
+            //     $q->where('b.dropoff_datetime', '<=', $now)
+            //     ->orWhereBetween('b.dropoff_datetime', [$todayStart, $todayStart->copy()->endOfDay()]);
+            // })
             ->whereNull('b.takeback_office_id')                               // key: no takeback office
             ->select(
                 'b.booking_id',
